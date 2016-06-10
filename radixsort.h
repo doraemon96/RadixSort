@@ -14,7 +14,15 @@
 #ifndef _RADIXSORT_H_
 #define _RADIXSROT_H_
 
+//Max source size for the kernels file (radixsort.cl)
 #define MAX_SOURCE_SIZE 0x100000
+
+//Number of kernels in the kernels file (radixsort.cl)
+#define N_KERNELS 3
+
+//Maximum length of a kernel in the kernels file (radixsort.cl)
+#define MAX_KERNEL_NAME 20
+
 
 /**/
 

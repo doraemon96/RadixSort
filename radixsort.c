@@ -12,7 +12,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-
+#include "createarray.c"
 #include <CL/cl.h>
 
 int main(void){
@@ -48,10 +48,69 @@ int main(void){
     context = clCreateContext(NULL, 1, &device_id, NULL, NULL, &errNum);
     command_queue = clCreateCommandQueue(context, device_id, NULL, &errNum);
 
-    /*Crear kernels desde el source */
+    /*Crear programa de kernels desde el source */
     cl_program program = NULL;
     program = clCreateProgramWithSource(context, 1, (const char**)&source_str, (const size_t *)&source_size, &errNum);
     
-    /*Crear kernel desde programa*/
-    errNum = 
+    /*Compilar programa*/
+    errNum = clBuildProgram(program, 1, &device_id, NULL, NULL, NULL);
     
+    /*Crear kernel*/
+    cl_kernel *kernels = (cl_kernel*)malloc(N_KERNELS * sizeof(cl_kernel));
+    errNum = clCreateKernelsInProgram(program, N_KERNELS, kernels, NULL); //errNum es uint y esto devuelve int, posible error de compilación?
+
+    /*Separar kernels (con nombre)*/
+    cl_kernel count, scan, reorder;
+    char kernelName[MAX_KERNEL_NAME];
+    int i;
+    for(i=0, i < N_KERNELS, i++){
+        errNum = clGetKernelInfo(kernels[i], CL_KERNEL_FUNCTION_NAME, sizeof(kernelName), kernelName, NULL);
+        if(errNum != CL_SUCCESS){
+            //Error!
+        }
+        if(strcmp(kernelName, "count") == 0){
+            count = kernels[i];
+        }
+        if(strcmp(kernelName, "naivedbParallelScan") == 0){
+            scan = kernels[i];
+        }
+        if(strcmp(kernelName, "reorder") == 0){
+            reorder = kernels[i];
+        }
+    }
+    
+    if((count == NULL) || (scan == NULL) || (reorder == NULL)){
+        //Error!
+    }
+    
+
+    /*Buffers*/
+    cl_uint max_cunits = 0;
+    clGetDeviceInfo(device_id, CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(cl_uint), (void*)&max_cunits, NULL);
+    int N = retN();
+    size_t sz = sizeof(int)*N; 
+    cl_mem input = (context, CL_MEM_READ_WRITE, sz), )    
+
+    /*Setear parametros a kernels*/
+    /*Count*/
+    errNum  = clSetKernelArg(count, 0, /*TODO:argsize*/, /*TODO:argval int *input*/);
+    errNum |= clSetKernelArg(count, 1, /*TODO:argsize*/, /*TODO:argval int *output*/);
+    errNum |= clSetKernelArg(count, 2, /*TODO:argsize*/, /*TODO:argval int radix*/);
+
+    /*Scan*/
+    errNum  = clSetKernelArg(scan, 0, /*TODO:argsize*/, /*TODO:argval int *input*/);
+    errNum |= clSetKernelArg(scan, 1, /*TODO:argsize*/, /*TODO:argval int *output*/);
+    errNum |= clSetKernelArg(scan, 2, /*TODO:argsize*/, /*TODO:argval L int *current*/);
+    errNum |= clSetKernelArg(scan, 3, /*TODO:argsize*/, /*TODO:argval L int *buffered*/);
+
+    /*Reorder*/
+    errNum  = clSetKernelArg(reorder, 0, /*TODO:argsize*/, /*TODO:argval int *input*/);
+    errNum |= clSetKernelArg(reorder, 1, /*TODO:argsize*/, /*TODO:argval int *output*/);
+    errNum |= clSetKernelArg(reorder, 2, /*TODO:argsize*/, /*TODO:argval int *scan*/);
+    errNum |= clSetKernelArg(reorder, 3, /*TODO:argsize*/, /*TODO:argval int *count*/);
+
+    if(errNum != CL_SUCCESS){
+        //Error!
+    }
+
+}
