@@ -15,6 +15,19 @@
 #include "createarray.c"
 #include <CL/cl.h>
 
+#ifndef _RS_FILLFUN_
+/*Definimos una funcion de testeo (random)*/
+*int generateArray(void)
+{
+    int i, *array=malloc(sizeof(int) * ARRLEN);
+    for(i=0; i<N; i++){
+        array[i] = rand(SEED);
+    }
+    return array;
+}
+#endif
+
+
 int main(void){
 
     cl_uint errNum;
@@ -82,20 +95,28 @@ int main(void){
     if((count == NULL) || (scan == NULL) || (reorder == NULL)){
         //Error!
     }
-    
 
     /*Buffers*/
-    cl_uint max_cunits = 0;
+    /*Create initial buffer (array to be sorted)*/
+    cl_uint max_cunits;
     clGetDeviceInfo(device_id, CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(cl_uint), (void*)&max_cunits, NULL);
-    int N = retN();
-    size_t sz = sizeof(int)*N; 
-    cl_mem input = (context, CL_MEM_READ_WRITE, sz), )    
+    size_t sz = sizeof(int)*ARRLEN;
+    int *array = generateArray();
+    if(max_cunits < (cl_uint)sz){
+        printf("Not defined yet");
+        exit(1);
+    }
 
+    cl_mem input = clCreateBuffer(context, CL_MEM_READ_WRITE, sz, &array, &errNum);
+    cl_mem output = clCreateBuffer(context, CL_MEM_READ_WRITE, sz, NULL, &errNum);
+    cl_mem count = clCreateBuffer(context, CL_MEM_READ_WRITE, sz, NULL, &errNum);
+    cl_mem scan = clCreateBuffer(context, CL_MEM_READ_WRITE, sz, NULL, &errNum);
+ 
     /*Setear parametros a kernels*/
     /*Count*/
-    errNum  = clSetKernelArg(count, 0, /*TODO:argsize*/, /*TODO:argval int *input*/);
-    errNum |= clSetKernelArg(count, 1, /*TODO:argsize*/, /*TODO:argval int *output*/);
-    errNum |= clSetKernelArg(count, 2, /*TODO:argsize*/, /*TODO:argval int radix*/);
+    errNum  = clSetKernelArg(count, 0, sz, input);
+    errNum |= clSetKernelArg(count, 1, sz, count);
+    errNum |= clSetKernelArg(count, 2, sizeof(unsigned int), &bit);
 
     /*Scan*/
     errNum  = clSetKernelArg(scan, 0, /*TODO:argsize*/, /*TODO:argval int *input*/);
@@ -114,3 +135,4 @@ int main(void){
     }
 
 }
+

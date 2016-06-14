@@ -15,7 +15,7 @@
  * COUNT
  */
 #define GETRADIX(e,r) ((unsigned int)(e >> r ) & 1 )
-__kernel void count(__global int *input, __global int *output, int radix)
+__kernel void count(__global int *input, __global int *output, unsigned int radix)
 {
     uint global_id = get_global_id(0);
 
