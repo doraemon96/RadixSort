@@ -12,16 +12,17 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include "createarray.c"
+#include <string.h>
+#include "radixsort.h"
 #include <CL/cl.h>
 
 #ifndef _RS_FILLFUN_
 /*Definimos una funcion de testeo (random)*/
-*int generateArray(void)
+int *generateArray(void)
 {
-    int i, *array=malloc(sizeof(int) * ARRLEN);
-    for(i=0; i<N; i++){
-        array[i] = rand(SEED);
+    int i, *array = (int*)malloc(sizeof(int) * ARRLEN);
+    for(i=0; i<ARRLEN; i++){
+        array[i] = rand();
     }
     return array;
 }
@@ -30,7 +31,7 @@
 
 int main(void){
 
-    cl_uint errNum;
+    cl_int errNum;
 
     FILE *fp;
     const char fileName[] = "./RadixSort.cl";
@@ -50,16 +51,16 @@ int main(void){
     cl_platform_id platform_id;
     cl_uint num_platforms;
     cl_device_id device_id;
-    cl_uint num_devices
+    cl_uint num_devices;
 
-    errNum = clGetPlatformIDs(1, &platform_id, &ret_num_platforms);
+    errNum = clGetPlatformIDs(1, &platform_id, &num_platforms);
     errNum = clGetDeviceIDs(platform_id, CL_DEVICE_TYPE_DEFAULT, 1, &device_id, &num_devices);
 
     /*Crear contexto y cola de comandos*/
     cl_context context;
     cl_command_queue command_queue;
     context = clCreateContext(NULL, 1, &device_id, NULL, NULL, &errNum);
-    command_queue = clCreateCommandQueue(context, device_id, NULL, &errNum);
+    command_queue = clCreateCommandQueue(context, device_id, 0, &errNum);
 
     /*Crear programa de kernels desde el source */
     cl_program program = NULL;
@@ -76,7 +77,7 @@ int main(void){
     cl_kernel count, scan, reorder;
     char kernelName[MAX_KERNEL_NAME];
     int i;
-    for(i=0, i < N_KERNELS, i++){
+    for(i=0; i < N_KERNELS; i++){
         errNum = clGetKernelInfo(kernels[i], CL_KERNEL_FUNCTION_NAME, sizeof(kernelName), kernelName, NULL);
         if(errNum != CL_SUCCESS){
             //Error!
@@ -109,30 +110,39 @@ int main(void){
 
     cl_mem input = clCreateBuffer(context, CL_MEM_READ_WRITE, sz, &array, &errNum);
     cl_mem output = clCreateBuffer(context, CL_MEM_READ_WRITE, sz, NULL, &errNum);
-    cl_mem count = clCreateBuffer(context, CL_MEM_READ_WRITE, sz, NULL, &errNum);
-    cl_mem scan = clCreateBuffer(context, CL_MEM_READ_WRITE, sz, NULL, &errNum);
+    cl_mem count_ret = clCreateBuffer(context, CL_MEM_READ_WRITE, sz, NULL, &errNum);
+    cl_mem scan_ret = clCreateBuffer(context, CL_MEM_READ_WRITE, sz, NULL, &errNum);
  
     /*Setear parametros a kernels*/
     /*Count*/
+    /*TEST*/ unsigned int bit = 0;
     errNum  = clSetKernelArg(count, 0, sz, input);
-    errNum |= clSetKernelArg(count, 1, sz, count);
+    errNum |= clSetKernelArg(count, 1, sz, count_ret);
     errNum |= clSetKernelArg(count, 2, sizeof(unsigned int), &bit);
 
+
     /*Scan*/
-    errNum  = clSetKernelArg(scan, 0, /*TODO:argsize*/, /*TODO:argval int *input*/);
-    errNum |= clSetKernelArg(scan, 1, /*TODO:argsize*/, /*TODO:argval int *output*/);
-    errNum |= clSetKernelArg(scan, 2, /*TODO:argsize*/, /*TODO:argval L int *current*/);
-    errNum |= clSetKernelArg(scan, 3, /*TODO:argsize*/, /*TODO:argval L int *buffered*/);
+//    errNum  = clSetKernelArg(scan, 0, /*TODO:argsize*/, /*TODO:argval int *input*/);
+//    errNum |= clSetKernelArg(scan, 1, /*TODO:argsize*/, /*TODO:argval int *output*/);
+//    errNum |= clSetKernelArg(scan, 2, /*TODO:argsize*/, /*TODO:argval L int *current*/);
+//    errNum |= clSetKernelArg(scan, 3, /*TODO:argsize*/, /*TODO:argval L int *buffered*/);
 
     /*Reorder*/
-    errNum  = clSetKernelArg(reorder, 0, /*TODO:argsize*/, /*TODO:argval int *input*/);
-    errNum |= clSetKernelArg(reorder, 1, /*TODO:argsize*/, /*TODO:argval int *output*/);
-    errNum |= clSetKernelArg(reorder, 2, /*TODO:argsize*/, /*TODO:argval int *scan*/);
-    errNum |= clSetKernelArg(reorder, 3, /*TODO:argsize*/, /*TODO:argval int *count*/);
+//    errNum  = clSetKernelArg(reorder, 0, /*TODO:argsize*/, /*TODO:argval int *input*/);
+//    errNum |= clSetKernelArg(reorder, 1, /*TODO:argsize*/, /*TODO:argval int *output*/);
+//    errNum |= clSetKernelArg(reorder, 2, /*TODO:argsize*/, /*TODO:argval int *scan*/);
+//    errNum |= clSetKernelArg(reorder, 3, /*TODO:argsize*/, /*TODO:argval int *count*/);
 
     if(errNum != CL_SUCCESS){
-        //Error!
+        printf("counterror");
+        exit(1);
     }
 
-}
+    errNum = clEnqueueNDRangeKernel(command_queue, count, 1, NULL, (size_t *)&max_cunits, NULL, 0, NULL, NULL);
 
+    clFinish(command_queue);
+
+    for(i=0; i<ARRLEN; i++)
+        printf("%d | ", ((int*)count_ret)[i]);
+    return 0;
+}
