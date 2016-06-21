@@ -14,7 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "radixsort.h"
-#include <CL/cl.h>
+#include <CL/opencl.h>
 
 #ifndef _RS_FILLFUN_
 /*Definimos una funcion de testeo (random)*/
@@ -34,13 +34,13 @@ int main(void){
     cl_int errNum;
 
     FILE *fp;
-    const char fileName[] = "./RadixSort.cl";
+    const char fileName[] = "./radixsort.cl";
     size_t source_size;
     char *source_str;
 
     fp = fopen(fileName, "r");
     if(!fp){
-        printf("Error al cargar \"%s\"", fileName);
+        printf("Error al cargar \"%s\"\n", fileName);
         return(1);
     }
     source_str = (char *)malloc(MAX_SOURCE_SIZE);               /*Podria hacer algo mas descriptivo que un DEFINE*/
@@ -54,7 +54,11 @@ int main(void){
     cl_uint num_devices;
 
     errNum = clGetPlatformIDs(1, &platform_id, &num_platforms);
-    errNum = clGetDeviceIDs(platform_id, CL_DEVICE_TYPE_DEFAULT, 1, &device_id, &num_devices);
+    errNum |= clGetDeviceIDs(platform_id, CL_DEVICE_TYPE_DEFAULT, 1, &device_id, &num_devices);
+    if(errNum != CL_SUCCESS){
+        printf("Error al obtener ID de Plataform/Device.\n");
+        exit(1);
+    }
 
     /*Crear contexto y cola de comandos*/
     cl_context context;
@@ -68,10 +72,18 @@ int main(void){
     
     /*Compilar programa*/
     errNum = clBuildProgram(program, 1, &device_id, NULL, NULL, NULL);
+    if(errNum != CL_SUCCESS){
+        printf("Error al crear el programa con \"clBuildProgram\".\n");
+        exit(1);
+    }
     
     /*Crear kernel*/
     cl_kernel *kernels = (cl_kernel*)malloc(N_KERNELS * sizeof(cl_kernel));
     errNum = clCreateKernelsInProgram(program, N_KERNELS, kernels, NULL); //errNum es uint y esto devuelve int, posible error de compilación?
+    if(errNum != CL_SUCCESS){
+        printf("Error al crear Kernels con \"clCreateKernels\".\n");
+        exit(1);
+    }
 
     /*Separar kernels (con nombre)*/
     cl_kernel count, scan, reorder;
@@ -80,7 +92,8 @@ int main(void){
     for(i=0; i < N_KERNELS; i++){
         errNum = clGetKernelInfo(kernels[i], CL_KERNEL_FUNCTION_NAME, sizeof(kernelName), kernelName, NULL);
         if(errNum != CL_SUCCESS){
-            //Error!
+            printf("Error al renombrar kernels. Usando \"clGetKernelInfo\".\n");
+            exit(1);
         }
         if(strcmp(kernelName, "count") == 0){
             count = kernels[i];
