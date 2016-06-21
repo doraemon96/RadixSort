@@ -71,9 +71,29 @@ int main(void){
     program = clCreateProgramWithSource(context, 1, (const char**)&source_str, (const size_t *)&source_size, &errNum);
     
     /*Compilar programa*/
-    errNum = clBuildProgram(program, 1, &device_id, NULL, NULL, NULL);
+    errNum = clBuildProgram(program, 1, &device_id, "-cl-std=CL1.1", NULL, NULL);
     if(errNum != CL_SUCCESS){
-        printf("Error al crear el programa con \"clBuildProgram\".\n");
+        printf("Error al crear el programa con \"clBuildProgram\": ");
+        switch(errNum){
+            case CL_INVALID_PROGRAM:        printf("program is an invalid program object.\n"); break;
+            case CL_INVALID_DEVICE:         printf("device_id is not associated with program.\n"); break;
+            case CL_INVALID_BUILD_OPTIONS:  printf("build options are invalid.\n"); break;
+            case CL_COMPILER_NOT_AVAILABLE: printf("a compiler is not available for \"clCreateProgramWithSource\".\n"); break;
+            case CL_BUILD_PROGRAM_FAILURE:  
+            {
+                printf("failure to build the program executable.\n"); 
+                size_t log_size;
+                clGetProgramBuildInfo(program, device_id, CL_PROGRAM_BUILD_LOG, 0, NULL, &log_size);
+                char *log = (char *) malloc(log_size);
+                clGetProgramBuildInfo(program, device_id, CL_PROGRAM_BUILD_LOG, log_size, log, NULL);
+		printf("*** BUILD INFO LOG *** \n%s\n", log);
+		free(log);
+                break;
+            }
+            case CL_OUT_OF_RESOURCES:       printf("error allocating resources by the OpenCL device implementation.\n"); break;
+            case CL_INVALID_OPERATION:      printf("kernel objects are already attached to program.\n"); break;
+            default: printf("Unmatched error.\n");
+        }
         exit(1);
     }
     
