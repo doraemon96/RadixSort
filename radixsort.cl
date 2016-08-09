@@ -30,7 +30,7 @@ __kernel void count(__global int *input, __global int *output, unsigned int radi
 /*
  * NAIVEDBPARALELLSCAN
  */
-#define SWAP(a,b)  {a^=b;b^=a;a^=b;}
+#define SWAP(a,b)  {__local int *tmp=a;a=b;b=tmp;}
 __kernel void naivedbParallelScan(__global int *input, __global int *output, __local int *current, __local int *buffered)
 {
     uint local_id = get_local_id(0);
@@ -41,7 +41,7 @@ __kernel void naivedbParallelScan(__global int *input, __global int *output, __l
     barrier(CLK_LOCAL_MEM_FENCE);
 
     int d;
-    for(d=1; d<local_size; d*2) {
+    for(d=1; d<local_size; d*=2) {
         if(global_id > d) {
             current[local_id] = buffered[local_id] + buffered[local_id - d];
         }
@@ -49,7 +49,7 @@ __kernel void naivedbParallelScan(__global int *input, __global int *output, __l
             current[local_id] = buffered[local_id];
         }
         barrier(CLK_LOCAL_MEM_FENCE);
-        SWAP(&current, &buffered);
+        SWAP(current, buffered);
     }
     output[global_id] = buffered[local_id];
 }
