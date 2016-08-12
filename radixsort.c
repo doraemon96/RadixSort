@@ -17,12 +17,13 @@
 #include <CL/opencl.h>
 
 #ifndef _RS_FILLFUN_
+#define _RS_FILLFUN_ generateArray()
 /*Definimos una funcion de testeo (random)*/
 int *generateArray(void)
 {
     int i, *array = (int*)malloc(sizeof(int) * ARRLEN);
     for(i=0; i<ARRLEN; i++){
-        array[i] = rand();
+        array[i] = rand() % 10000;
     }
     return array;
 }
@@ -54,11 +55,16 @@ int main(void){
     cl_uint num_devices;
 
     errNum = clGetPlatformIDs(1, &platform_id, &num_platforms);
-    errNum |= clGetDeviceIDs(platform_id, CL_DEVICE_TYPE_DEFAULT, 1, &device_id, &num_devices);
+    errNum |= clGetDeviceIDs(platform_id, CL_DEVICE_TYPE_DEFAULT, 1, &device_id, &num_devices);	
     if(errNum != CL_SUCCESS){
         printf("Error al obtener ID de Plataform/Device.\n");
         exit(1);
     }
+    size_t dev_name_size;
+    errNum = clGetDeviceInfo(device_id, CL_DEVICE_NAME, 0, NULL, &dev_name_size);
+    char *dev_name = malloc(dev_name_size);
+    errNum = clGetDeviceInfo(device_id, CL_DEVICE_NAME, dev_name_size, dev_name, NULL);
+    printf("Device info: %s\n", dev_name);
 
     /*Crear contexto y cola de comandos*/
     cl_context context;
@@ -127,32 +133,37 @@ int main(void){
     }
     
     if((count == NULL) || (scan == NULL) || (reorder == NULL)){
-        //Error!
+        printf("ERROR");
+	exit(1);
     }
 
     /*Buffers*/
     /*Create initial buffer (array to be sorted)*/
+    int *array = _RS_FILLFUN_;
+    int ret_count[ARRLEN] = {69};
+
     cl_uint max_cunits;
     clGetDeviceInfo(device_id, CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(cl_uint), (void*)&max_cunits, NULL);
-    size_t sz = sizeof(int)*ARRLEN;
-    int *array = generateArray();
-    if(max_cunits < (cl_uint)sz){
-        printf("Not defined yet");
+    if((max_cunits * (cl_uint)WORKGROUP_SZ) < (cl_uint)ARRLEN){	
+        printf("Not defined yet\nWorkItemNumber: %d\n", max_cunits * (cl_uint)WORKGROUP_SZ);
         exit(1);
     }
 
+    printf("WorkItemNumber: %d\n", max_cunits * (cl_uint)WORKGROUP_SZ);
+    
+    size_t sz = sizeof(int)*ARRLEN;
     cl_mem input = clCreateBuffer(context, CL_MEM_READ_WRITE, sz, &array, &errNum);
     cl_mem output = clCreateBuffer(context, CL_MEM_READ_WRITE, sz, NULL, &errNum);
-    cl_mem count_ret = clCreateBuffer(context, CL_MEM_READ_WRITE, sz, NULL, &errNum);
+    cl_mem count_ret = clCreateBuffer(context, CL_MEM_READ_WRITE, sz, &ret_count, &errNum);
     cl_mem scan_ret = clCreateBuffer(context, CL_MEM_READ_WRITE, sz, NULL, &errNum);
  
+
     /*Setear parametros a kernels*/
     /*Count*/
-    /*TEST*/ unsigned int bit = 0;
-    errNum  = clSetKernelArg(count, 0, sz, input);
-    errNum |= clSetKernelArg(count, 1, sz, count_ret);
-    errNum |= clSetKernelArg(count, 2, sizeof(unsigned int), &bit);
-
+    /*TEST*/ int bit = 0;
+    errNum  = clSetKernelArg(count, 0, sizeof(cl_mem), (void*)&input);
+    errNum |= clSetKernelArg(count, 1, sizeof(cl_mem), (void*)&count_ret);
+    errNum |= clSetKernelArg(count, 2, sizeof(int), (void*)&bit);
 
     /*Scan*/
 //    errNum  = clSetKernelArg(scan, 0, /*TODO:argsize*/, /*TODO:argval int *input*/);
@@ -167,7 +178,7 @@ int main(void){
 //    errNum |= clSetKernelArg(reorder, 3, /*TODO:argsize*/, /*TODO:argval int *count*/);
 
     if(errNum != CL_SUCCESS){
-        printf("counterror");
+        printf("counterror\n");
         exit(1);
     }
 
@@ -176,6 +187,11 @@ int main(void){
     clFinish(command_queue);
 
     for(i=0; i<ARRLEN; i++)
-        printf("%d | ", ((int*)count_ret)[i]);
+        printf("[%d]", array[i]);
+    printf("\n\n");
+
+    for(i=0; i<ARRLEN; i++)
+        printf("[%d] ", ((int*)count_ret)[i]);
+    printf("\n");
     return 0;
 }
