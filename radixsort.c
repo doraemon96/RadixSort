@@ -145,7 +145,7 @@ int main(void){
     cl_uint max_cunits;
     clGetDeviceInfo(device_id, CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(cl_uint), (void*)&max_cunits, NULL);
     if((max_cunits * (cl_uint)WORKGROUP_SZ) < (cl_uint)ARRLEN){	
-        printf("Not defined yet\nWorkItemNumber: %d\n", max_cunits * (cl_uint)WORKGROUP_SZ);
+        printf("Not defined yet\nWorkItemNumber: %ud\n", max_cunits * (cl_uint)WORKGROUP_SZ);
         exit(1);
     }
 
@@ -182,7 +182,17 @@ int main(void){
         exit(1);
     }
 
-    errNum = clEnqueueNDRangeKernel(command_queue, count, 1, NULL, (size_t *)&max_cunits, NULL, 0, NULL, NULL);
+
+    size_t workGroupSize;
+    clGetDeviceInfo(device_id, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(size_t), (void*)&workGroupSize, NULL);
+    size_t global_work_size = (ARRLEN % workGroupSize == 0? ARRLEN / workGroupSize : ARRLEN / workGroupSize + 1) * workGroupSize;
+    size_t local_work_size = workGroupSize;
+    printf("GlobalWorkSize = %zd\nLocalWorkSize = %zd\n", global_work_size, local_work_size);
+    errNum = clEnqueueNDRangeKernel(command_queue, count, 1, NULL, &global_work_size, &local_work_size, 0, NULL, NULL);
+    if(errNum != CL_SUCCESS){
+        printf("clEnqueueNDRangeKernel error \n");
+        exit(1);
+    }
 
     clFinish(command_queue);
 

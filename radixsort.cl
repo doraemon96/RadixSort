@@ -10,19 +10,30 @@
  * Implementation by Paoloni Gianfranco and Soncini Nicolas.
  */
 
+#include <radixsort.h>
 
 /*
  * COUNT
  */
 #define GETRADIX(e,r) ((e >> r ) & 1 )  //Used to be casted to (unsigned int), shouldn't everything?
-__kernel void count(__global int *input, __global int *output, int radix)
+__kernel void count(__global const int *input, __global int *output, int radix)
 {
     uint global_id = get_global_id(0);
+    
+    //__local int local_input[];
+    //__local int local_output[];
 
     //Obtain the current "radix" (bit)
     output[global_id] = GETRADIX(input[global_id], radix);
+    barrier(CLK_LOCAL_MEM_FENCE);
+
     //Invert the results
-    output[global_id] = output[global_id]? 0 : 1 ;
+    if (output[global_id] == 0)
+        output[global_id] = 1;
+    else
+        output[global_id] = 0;
+
+    barrier(CLK_LOCAL_MEM_FENCE);
 }
 
 
