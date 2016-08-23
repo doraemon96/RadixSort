@@ -55,7 +55,7 @@ int main(void){
     cl_uint num_devices;
 
     errNum = clGetPlatformIDs(1, &platform_id, &num_platforms);
-    errNum |= clGetDeviceIDs(platform_id, CL_DEVICE_TYPE_DEFAULT, 1, &device_id, &num_devices);	
+    errNum |= clGetDeviceIDs(platform_id, CL_DEVICE_TYPE_GPU, 1, &device_id, &num_devices);	
     if(errNum != CL_SUCCESS){
         printf("Error al obtener ID de Plataform/Device.\n");
         exit(1);
@@ -188,7 +188,8 @@ int main(void){
     size_t global_work_size = (ARRLEN % workGroupSize == 0? ARRLEN / workGroupSize : ARRLEN / workGroupSize + 1) * workGroupSize;
     size_t local_work_size = workGroupSize;
     printf("GlobalWorkSize = %zd\nLocalWorkSize = %zd\n", global_work_size, local_work_size);
-    errNum = clEnqueueNDRangeKernel(command_queue, count, 1, NULL, &global_work_size, &local_work_size, 0, NULL, NULL);
+
+    errNum = clEnqueueNDRangeKernel(command_queue, count, 1, NULL, &global_work_size, /*&local_work_size*/NULL, 0, NULL, NULL);
     if(errNum != CL_SUCCESS){
         printf("clEnqueueNDRangeKernel error \n");
         exit(1);
@@ -196,12 +197,16 @@ int main(void){
 
     clFinish(command_queue);
 
+
+    int* outarray = malloc(sz);
+    errNum = clEnqueueReadBuffer(command_queue, output, CL_TRUE, 0, sz, (void *)outarray, 0, NULL, NULL);
+
     for(i=0; i<ARRLEN; i++)
         printf("[%d]", array[i]);
     printf("\n\n");
 
     for(i=0; i<ARRLEN; i++)
-        printf("[%d] ", ((int*)count_ret)[i]);
+        printf("[%d]", outarray[i]);
     printf("\n");
     return 0;
 }

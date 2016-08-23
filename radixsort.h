@@ -12,7 +12,7 @@
 
 
 #ifndef _RADIXSORT_H_
-#define _RADIXSROT_H_
+#define _RADIXSORT_H_
 
 //Max source size for the kernels file (radixsort.cl)
 #define MAX_SOURCE_SIZE 0x100000
@@ -29,7 +29,7 @@
 //Size of the array to order (if _RS_FILLFUN_ not defined, generateArray will create a random one).
 #define ARRLEN 256
 
-#define _RS_FILLFUN_ arraywithones()
+/*#define _RS_FILLFUN_ arraywithones()
 int* arraywithones(void)
 {
     int i, *array = malloc(sizeof(int) * ARRLEN);
@@ -38,5 +38,5 @@ int* arraywithones(void)
 
     return array;
 }
-
+*/
 #endif /*_RADIXSORT_H_*/
