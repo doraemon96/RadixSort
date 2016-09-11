@@ -148,9 +148,8 @@ int main(void){
         printf("Not defined yet\nWorkItemNumber: %ud\n", max_cunits * (cl_uint)WORKGROUP_SZ);
         exit(1);
     }
-
     printf("WorkItemNumber: %d\n", max_cunits * (cl_uint)WORKGROUP_SZ);
-    
+
     size_t sz = sizeof(int)*ARRLEN;
     cl_mem input = clCreateBuffer(context, CL_MEM_READ_WRITE, sz, &array, &errNum);
     cl_mem output = clCreateBuffer(context, CL_MEM_READ_WRITE, sz, NULL, &errNum);
@@ -183,13 +182,13 @@ int main(void){
     }
 
 
-    size_t workGroupSize;
-    clGetDeviceInfo(device_id, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(size_t), (void*)&workGroupSize, NULL);
+    size_t workGroupSize = 64;
+    //clGetDeviceInfo(device_id, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(size_t), (void*)&workGroupSize, NULL);
     size_t global_work_size = (ARRLEN % workGroupSize == 0? ARRLEN / workGroupSize : ARRLEN / workGroupSize + 1) * workGroupSize;
     size_t local_work_size = workGroupSize;
     printf("GlobalWorkSize = %zd\nLocalWorkSize = %zd\n", global_work_size, local_work_size);
 
-    errNum = clEnqueueNDRangeKernel(command_queue, count, 1, NULL, &global_work_size, /*&local_work_size*/NULL, 0, NULL, NULL);
+    errNum = clEnqueueNDRangeKernel(command_queue, count, 1, NULL, &global_work_size, &local_work_size/*NULL*/, 0, NULL, NULL);
     if(errNum != CL_SUCCESS){
         printf("clEnqueueNDRangeKernel error \n");
         exit(1);
