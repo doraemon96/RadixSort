@@ -1,0 +1,7 @@
+CC=gcc
+#El -L puede ser sin el /sdk (ahi esta libOpenCl.so pero no la .so.1 (aunque nose que es tampoco jaja))
+CFLAGS=-g -Wall -std=c99 -I/opt/AMDAPPSDK-3.0/include/ -L/opt/AMDAPPSDK-3.0/lib/x86_64/sdk
+CFLAGS_COMP= -g -Wall -Wno-comment
+LIBS=-lOpenCL
+hello_world:
+	$(CC) radixsort.c -o radixmain $(CFLAGS) $(CFLAGS_COMP) $(LIBS)
