@@ -15,25 +15,7 @@
 /*
  * COUNT
  */
-#define GETRADIX(e,r) ((e >> r ) & 1 )  //Used to be casted to (unsigned int), shouldn't everything?
-
-
-__kernel void count(__global const int *input, __global int *output, int size)
-{
-    //__local int entrada[256];
-    //__local int salida[size];
-
-    uint local_id = get_local_id(0);
-    uint global_id = get_global_id(0);
-    uint group_id = get_group_id(0);
-
-//    event_t event = async_work_group_copy(entrada, &input[256*work_group], size, 0);
-//    wait_group_events(1, &event);
-    output[global_id] = 124;
-    barrier(CLK_GLOBAL_MEM_FENCE);
-}
-
-/*
+#define GETRADIX(e,r) ((e >> r ) & 1 )
 __kernel void count(__global const int *input, __global int *output, int radix)
 {
     uint global_id = get_global_id(0);
@@ -52,7 +34,9 @@ __kernel void count(__global const int *input, __global int *output, int radix)
 
     barrier(CLK_LOCAL_MEM_FENCE);
 }
-*/
+
+
+
 /*
  * NAIVEDBPARALELLSCAN
  */
