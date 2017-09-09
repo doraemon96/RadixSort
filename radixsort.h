@@ -21,13 +21,14 @@
 #define MAX_SOURCE_SIZE 0x100000
 
 //Number of kernels in the kernels file (radixsort.cl)
-#define N_KERNELS 3 //TODO: remove
 #define KERNELS_NUMBER 3
 
 //Maximum length of a kernel in the kernels file (radixsort.cl)
 #define MAX_KERNEL_NAME 20
 
 #define WORKGROUP_SZ 256
+#define BUCK 0  //TODO
+#define RADIX 0 //TODO
 
 /*Testing functions*/
 //Size of the array to order (if _RS_FILLFUN_ not defined, generateArray will create a random one).
