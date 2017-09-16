@@ -152,10 +152,26 @@ int main() {
     
     //Create program from file
     program = clCreateProgramWithSource(context, 1, (const char**)&file_sourceStr, (const size_t*)&file_sourceSize, &errNum);
-    ASSERT(errNum == CL_SUCCESS);
+    if(!errNum == CL_SUCCESS){
+        printf("Error obtaining program from source. Using \"clCreateProgramWithSource\"\n");
+        exit(1);
+    }
 
     //Compile for openCL 1.1
     errNum = clBuildProgram(program, 1, devices, "-cl-std=CL1.1", NULL, NULL);
+    if(!errNum == CL_SUCCESS){
+        printf("Error building program. Using \"clBuildProgram\"\n");
+        if(errNum == CL_BUILD_PROGRAM_FAILURE){
+            printf("Failure to build the program executable\n");
+            size_t log_size;
+            clGetProgramBuildInfo(program, devices[0], CL_PROGRAM_BUILD_LOG, 0, NULL, &log_size);
+            char *log = (char *) malloc(log_size);
+            clGetProgramBuildInfo(program, devices[0], CL_PROGRAM_BUILD_LOG, log_size, log, NULL);
+            printf("*** BUILD INFO LOG *** \n%s\n", log);
+            free(log);
+        }
+        exit(1);
+    }
 
     //----------------
     // Create kernels
@@ -164,6 +180,10 @@ int main() {
     
     //Take all kernels from file
     errNum = clCreateKernelsInProgram(program, KERNELS_NUMBER, kernels, NULL);
+    if(!errNum == CL_SUCCESS){
+        printf("Error obtaining kernels. Using \"clCreateKernelsInProgram\"\n");
+        exit(1);
+    }
     
     //Separate kernels (manually)
     cl_kernel count, scan, reorder;
@@ -198,7 +218,7 @@ int main() {
     errNum = clSetKernelArg(count, 0, sizeof(cl_mem), &array_buffer);    // Input array /*TODO: Change with pass*/
     errNum |= clSetKernelArg(count, 1, sizeof(cl_mem), &output_buffer);  // Output array
     errNum |= clSetKernelArg(count, 2, sizeof(int), &pass);              // Pass number /*TODO: Change with pass*/
-    errnum |= clSetKernelArg(count, 3, sizeof(int), &arrlen);            // Number of elements in array
+    errNum |= clSetKernelArg(count, 3, sizeof(int), &arrlen);            // Number of elements in array
 
     //Scan arguments
     errNum = clSetKernelArg(scan, 0, sizeof(cl_mem), &array_buffer);     // Input array
@@ -251,7 +271,9 @@ int main() {
     // Free resources
     //----------------
     //openCL
-    clReleaseKernel(count); clReleaseKernel(scan); clReleaseKernel(reorder);
+    clReleaseKernel(count);
+    clReleaseKernel(scan);
+//    clReleaseKernel(reorder);
     clReleaseProgram(program);
     clReleaseCommandQueue(commandQueue);
     clReleaseMemObject(array_buffer); clReleaseMemObject(output_buffer);
