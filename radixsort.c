@@ -152,6 +152,8 @@ int main() {
     
     //Create program from file
     program = clCreateProgramWithSource(context, 1, (const char**)&file_sourceStr, (const size_t*)&file_sourceSize, &errNum);
+    ASSERT(errNum == CL_SUCCESS);
+
     //Compile for openCL 1.1
     errNum = clBuildProgram(program, 1, devices, "-cl-std=CL1.1", NULL, NULL);
 
@@ -175,13 +177,13 @@ int main() {
         }
         if(strcmp(kernelName, "count") == 0) 
             count = kernels[i];
-        if(strcmp(kernelName, "naivedbParallelScan") == 0) 
+        if(strcmp(kernelName, "scan") == 0) 
             scan = kernels[i];
-        if(strcmp(kernelName, "reorder") == 0) 
-            reorder = kernels[i];
+//        if(strcmp(kernelName, "reorder") == 0) 
+//            reorder = kernels[i];
     }   
     
-    if((count == NULL) || (scan == NULL) || (reorder == NULL)){
+    if((count == NULL) || (scan == NULL) /*|| (reorder == NULL)*/){
         printf("ERROR");
         exit(1);
     }
@@ -204,6 +206,7 @@ int main() {
     errNum |= clSetKernelArg(scan, 2, sizeof(int), &arrlen);             // Number of elements in array
 
     //Reorder arguments
+    //TODO
 
 
     //---------------------------------
