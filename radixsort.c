@@ -219,6 +219,7 @@ int main() {
     errNum |= clSetKernelArg(count, 1, sizeof(cl_mem), &output_buffer);  // Output array
     errNum |= clSetKernelArg(count, 2, sizeof(int), &pass);              // Pass number /*TODO: Change with pass*/
     errNum |= clSetKernelArg(count, 3, sizeof(int), &arrlen);            // Number of elements in array
+    errNum |= clSetKernelArg(count, 4, sizeof(uint)*BUCK*ITEMS
 
     //Scan arguments
     errNum = clSetKernelArg(scan, 0, sizeof(cl_mem), &array_buffer);     // Input array

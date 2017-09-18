@@ -37,14 +37,14 @@ __kernel void count(const __global int* input,
     barrier(CLK_LOCAL_MEM_FENCE);
 
     //Calculate elements to process per item
-    var size = (nkeys / n_groups) / l_size;
+    int size = (nkeys / n_groups) / l_size;
     //Calculate where to start on the global array
-    var start = g_id * size;
+    int start = g_id * size;
     
     for(i = 0; i < size; i++) {
         int key = input[i + start];
         //Extract the corresponding radix of the key
-        key = ((key >> (pass * RADIX)) & (BUCK - 1);
+        key = ((key >> (pass * RADIX)) & (BUCK - 1));
         //Count the ocurrences in the corresponding bucket
         local_histo[key * l_size + l_id]++;
     }
@@ -57,7 +57,7 @@ __kernel void count(const __global int* input,
         //"to" maps to the global buckets
         int to = i * n_groups + group_id;
         //Map the local data to its global position
-        output[local_size * to + l_id] = local_histo[from];
+        output[l_size * to + l_id] = local_histo[from];
     }
     
     barrier(CLK_GLOBAL_MEM_FENCE);
@@ -76,7 +76,7 @@ __kernel void scan(__global int* input,
 
     uint n_groups = (uint) get_num_groups(0); 
 
-    __local int local_scan[nkeys]; //TODO: agregarlo en args?
+    __local int local_scan[nkeys]; //FIXME: agregarlo en args?
 
     //UP SWEEP
     local_scan[2 * l_id] = input[2 * g_id];
@@ -116,8 +116,6 @@ __kernel void scan(__global int* input,
     barrier(CLK_LOCAL_MEM_FENCE);
 
     //Write results from Local to Global memory
-    input[2 * global_id]     = local_scan[2 * local_id];
-    input[2 * global_id + 1] = local_scan[2 * local_id + 1];
+    input[2 * g_id]     = local_scan[2 * l_id];
+    input[2 * g_id + 1] = local_scan[2 * l_id + 1];
 }
-
-

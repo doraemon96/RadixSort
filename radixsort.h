@@ -26,9 +26,13 @@
 //Maximum length of a kernel in the kernels file (radixsort.cl)
 #define MAX_KERNEL_NAME 20
 
-#define WORKGROUP_SZ 256
-#define BUCK 0  //TODO
-#define RADIX 0 //TODO
+#define WG_SIZE 64
+#define N_GROUPS 16
+#define BITS 32
+//Number of buckets necessary
+#define BUCK (1 << RADIX)
+//Number of bits in the radix
+#define RADIX 1
 
 /*Testing functions*/
 //Size of the array to order (if _RS_FILLFUN_ not defined, generateArray will create a random one).
