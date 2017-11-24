@@ -176,6 +176,26 @@ int main() {
     //----------------
     // Create kernels
     //----------------
+
+    cl_kernel count, scan, reorder;
+    count = clCreateKernel(program, "count", &errNum);
+    if(!errNum == CL_SUCCESS){
+        printf("Error creating count kernel");
+        exit(1);
+    }
+    scan = clCreateKernel(program, "scan", &errNum);
+    if(!errNum == CL_SUCCESS){
+        printf("Error creating scan kernel");
+        exit(1);
+    }
+/*  reorder = clCreateKernel(program, "reorder", &errNum);
+    if(!errNum == CL_SUCCESS){
+        printf("Error creating count kernel");
+        exit(1);
+    }
+*/
+
+/*
     cl_kernel *kernels = (cl_kernel*)malloc(sizeof(cl_kernel)*KERNELS_NUMBER); //More than one kernel in kernel file
     
     //Take all kernels from file
@@ -203,10 +223,12 @@ int main() {
 //            reorder = kernels[i];
     }   
     
-    if((count == NULL) || (scan == NULL) /*|| (reorder == NULL)*/){
+    if((count == NULL) || (scan == NULL) || (reorder == NULL)){
         printf("ERROR");
         exit(1);
     }
+
+*/
 
     //----------------------
     // Set kernel arguments
@@ -224,7 +246,7 @@ int main() {
     //Scan arguments
     errNum = clSetKernelArg(scan, 0, sizeof(cl_mem), &array_buffer);     // Input array
     errNum |= clSetKernelArg(scan, 1, sizeof(cl_mem), &output_buffer);   // Output array
-    errNum |= clSetKernelArg(scan, 2, sizeof(cl_uint) * /*HISTOSPLIT?*/, NULL);             // Local Scan
+    errNum |= clSetKernelArg(scan, 2, sizeof(cl_uint) /*TODO: HISTOSPLIT?*/, NULL);             // Local Scan
 //    errNum |= clSetKernelArg(scan, 3, sizeof(int), &arrlen);
 
     //Reorder arguments
@@ -243,7 +265,7 @@ int main() {
     //-------------------------------
     
     errNum = clEnqueueNDRangeKernel(commandQueue, count, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL);
-    errNum = clEnqueueNDRangeKernel(commandQueue, scan, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL);
+//    errNum = clEnqueueNDRangeKernel(commandQueue, scan, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL);
 
     //-------------------
     // Enqueue host read (device buffer -> host)
@@ -258,12 +280,13 @@ int main() {
 
     //******************+TESTING+**********************
     
-    for(i=0; i<ARRLEN; i++) {
-        printf("[%d]", array[i]);
+    int k;
+    for(k=0; k<ARRLEN; k++) {
+        printf("[%d]", array[k]);
     }
     printf("\n\n");
-    for(i=0; i<ARRLEN; i++) {
-        printf("[%d]", output[i]);
+    for(k=0; k<ARRLEN; k++) {
+        printf("[%d]", output[k]);
     }
     printf("\n\n");
 
