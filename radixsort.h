@@ -43,7 +43,7 @@
 
 /*Testing functions*/
 //Size of the array to order (if _RS_FILLFUN_ not defined, generateArray will create a random one).
-#define ARRLEN 512
+#define ARRLEN 64
 
 /*#define _RS_FILLFUN_ arraywithones()
 int* arraywithones(void)

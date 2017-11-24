@@ -144,6 +144,11 @@ int main() {
     //----------------------
     
     errNum = clEnqueueWriteBuffer(commandQueue, array_buffer, CL_FALSE /*TODO*/, 0, array_dataSize, array, 0, NULL, NULL);
+    if(!errNum == CL_SUCCESS){
+        printf("Array buffer write terminated abruptly");
+        exit(1);
+    }
+    clFinish(commandQueue);
 
     //----------------------------
     // Create and compile program
@@ -195,7 +200,7 @@ int main() {
     }
 */
 
-/*
+/* TODO: DELETE UNTIL COMMENTARY END
     cl_kernel *kernels = (cl_kernel*)malloc(sizeof(cl_kernel)*KERNELS_NUMBER); //More than one kernel in kernel file
     
     //Take all kernels from file
@@ -265,13 +270,26 @@ int main() {
     //-------------------------------
     
     errNum = clEnqueueNDRangeKernel(commandQueue, count, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL);
-//    errNum = clEnqueueNDRangeKernel(commandQueue, scan, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL);
+    if(!errNum == CL_SUCCESS){
+        printf("Count kernel terminated abruptly");
+        exit(1);
+    }
+    clFinish(commandQueue);
+/*
+    errNum = clEnqueueNDRangeKernel(commandQueue, scan, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL);
+    if(!errNum == CL_SUCCESS){
+        printf("Count kernel terminated abruptly");
+        exit(1);
+    }
+    clFinish(commandQueue);
+*/
 
     //-------------------
     // Enqueue host read (device buffer -> host)
     //-------------------
     
-    clEnqueueReadBuffer(commandQueue, output_buffer, CL_TRUE, 0, array_dataSize, output, 0, NULL, NULL);
+    errNum = clEnqueueReadBuffer(commandQueue, output_buffer, CL_TRUE, 0, array_dataSize, output, 0, NULL, NULL);
+    clFinish(commandQueue);
     
     //Verify output with normal function
     //bool result = true;
