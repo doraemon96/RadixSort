@@ -16,6 +16,7 @@
 
 __kernel void count(const __global int* input,
                     __global int* output,
+                    __local int* local_histo,
                     const int pass,
                     const int nkeys)
 {
@@ -26,8 +27,6 @@ __kernel void count(const __global int* input,
     uint group_id = (uint) get_group_id(0);
     uint n_groups = (uint) get_num_groups(0); 
     
-    __local int* local_histo; //TODO: MALLOC maybe?
-
     //Set the buckets of each item to 0
     int i;
     for(i = 0; i < BUCK; i++) {
@@ -68,15 +67,14 @@ __kernel void count(const __global int* input,
 //TODO: Necesito output aca? Lo dejo por consistencia?
 __kernel void scan(__global int* input,
                    __global int* output,
-                   const int nkeys)
+                   __local int* local_scan)
+//                   const int nkeys) Obsoleto?
 {
     uint g_id = (uint) get_global_id(0);
     uint l_id = (uint) get_local_id(0);
     uint l_size = (uint) get_local_size(0);    
 
     uint n_groups = (uint) get_num_groups(0); 
-
-    __local int local_scan[nkeys]; //FIXME: agregarlo en args?
 
     //UP SWEEP
     local_scan[2 * l_id] = input[2 * g_id];
@@ -116,6 +114,7 @@ __kernel void scan(__global int* input,
     barrier(CLK_LOCAL_MEM_FENCE);
 
     //Write results from Local to Global memory
+    //TODO: Write to output or leave in input?
     input[2 * g_id]     = local_scan[2 * l_id];
     input[2 * g_id + 1] = local_scan[2 * l_id + 1];
 }

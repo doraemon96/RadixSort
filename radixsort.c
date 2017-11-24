@@ -217,14 +217,15 @@ int main() {
     int arrlen = ARRLEN;
     errNum = clSetKernelArg(count, 0, sizeof(cl_mem), &array_buffer);    // Input array /*TODO: Change with pass*/
     errNum |= clSetKernelArg(count, 1, sizeof(cl_mem), &output_buffer);  // Output array
-    errNum |= clSetKernelArg(count, 2, sizeof(int), &pass);              // Pass number /*TODO: Change with pass*/
-    errNum |= clSetKernelArg(count, 3, sizeof(int), &arrlen);            // Number of elements in array
-    errNum |= clSetKernelArg(count, 4, sizeof(uint)*BUCK*WG_SIZE);       // TODO: explain (?
+    errNum |= clSetKernelArg(count, 2, sizeof(cl_uint)*BUCK*WG_SIZE, NULL); // Local Histogram
+    errNum |= clSetKernelArg(count, 3, sizeof(int), &pass);              // Pass number /*TODO: Change with pass*/
+    errNum |= clSetKernelArg(count, 4, sizeof(int), &arrlen);            // Number of elements in array /*TODO: Round to power of 2*/
 
     //Scan arguments
     errNum = clSetKernelArg(scan, 0, sizeof(cl_mem), &array_buffer);     // Input array
     errNum |= clSetKernelArg(scan, 1, sizeof(cl_mem), &output_buffer);   // Output array
-    errNum |= clSetKernelArg(scan, 2, sizeof(int), &arrlen);             // Number of elements in array
+    errNum |= clSetKernelArg(scan, 2, sizeof(cl_uint) * /*HISTOSPLIT?*/, NULL);             // Local Scan
+//    errNum |= clSetKernelArg(scan, 3, sizeof(int), &arrlen);
 
     //Reorder arguments
     //TODO
