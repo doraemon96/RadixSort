@@ -145,7 +145,7 @@ int main() {
     
     errNum = clEnqueueWriteBuffer(commandQueue, array_buffer, CL_FALSE /*TODO*/, 0, array_dataSize, array, 0, NULL, NULL);
     if(!errNum == CL_SUCCESS){
-        printf("Array buffer write terminated abruptly");
+        printf("Array buffer write terminated abruptly\n");
         exit(1);
     }
     clFinish(commandQueue);
@@ -185,55 +185,14 @@ int main() {
     cl_kernel count, scan, reorder;
     count = clCreateKernel(program, "count", &errNum);
     if(!errNum == CL_SUCCESS){
-        printf("Error creating count kernel");
+        printf("Error creating count kernel\n");
         exit(1);
     }
     scan = clCreateKernel(program, "scan", &errNum);
     if(!errNum == CL_SUCCESS){
-        printf("Error creating scan kernel");
+        printf("Error creating scan kernel\n");
         exit(1);
     }
-/*  reorder = clCreateKernel(program, "reorder", &errNum);
-    if(!errNum == CL_SUCCESS){
-        printf("Error creating count kernel");
-        exit(1);
-    }
-*/
-
-/* TODO: DELETE UNTIL COMMENTARY END
-    cl_kernel *kernels = (cl_kernel*)malloc(sizeof(cl_kernel)*KERNELS_NUMBER); //More than one kernel in kernel file
-    
-    //Take all kernels from file
-    errNum = clCreateKernelsInProgram(program, KERNELS_NUMBER, kernels, NULL);
-    if(!errNum == CL_SUCCESS){
-        printf("Error obtaining kernels. Using \"clCreateKernelsInProgram\"\n");
-        exit(1);
-    }
-    
-    //Separate kernels (manually)
-    cl_kernel count, scan, reorder;
-    char kernelName[MAX_KERNEL_NAME];
-    int i;
-    for(i=0; i < KERNELS_NUMBER; i++){
-        errNum = clGetKernelInfo(kernels[i], CL_KERNEL_FUNCTION_NAME, sizeof(kernelName), kernelName, NULL);
-        if(errNum != CL_SUCCESS){
-            printf("Error renaming kernels. Using \"clGetKernelInfo\"\n");
-            exit(1);
-        }
-        if(strcmp(kernelName, "count") == 0) 
-            count = kernels[i];
-        if(strcmp(kernelName, "scan") == 0) 
-            scan = kernels[i];
-//        if(strcmp(kernelName, "reorder") == 0) 
-//            reorder = kernels[i];
-    }   
-    
-    if((count == NULL) || (scan == NULL) || (reorder == NULL)){
-        printf("ERROR");
-        exit(1);
-    }
-
-*/
 
     //----------------------
     // Set kernel arguments
@@ -242,17 +201,15 @@ int main() {
     //Count arguments
     int pass = 0;
     int arrlen = ARRLEN;
-    errNum = clSetKernelArg(count, 0, sizeof(cl_mem), &array_buffer);    // Input array /*TODO: Change with pass*/
-    errNum |= clSetKernelArg(count, 1, sizeof(cl_mem), &output_buffer);  // Output array
+    errNum = clSetKernelArg(count, 0, sizeof(cl_mem), &array_buffer);       // Input array /*TODO: Change with pass*/
+    errNum |= clSetKernelArg(count, 1, sizeof(cl_mem), &output_buffer);     // Output array
     errNum |= clSetKernelArg(count, 2, sizeof(cl_uint)*BUCK*WG_SIZE, NULL); // Local Histogram
-    errNum |= clSetKernelArg(count, 3, sizeof(int), &pass);              // Pass number /*TODO: Change with pass*/
-    errNum |= clSetKernelArg(count, 4, sizeof(int), &arrlen);            // Number of elements in array /*TODO: Round to power of 2*/
+    errNum |= clSetKernelArg(count, 3, sizeof(int), &pass);                 // Pass number /*TODO: Change with pass*/
+    errNum |= clSetKernelArg(count, 4, sizeof(int), &arrlen);               // Number of elements in array /*TODO: Round to power of 2*/
 
     //Scan arguments
-    errNum = clSetKernelArg(scan, 0, sizeof(cl_mem), &array_buffer);     // Input array
-    errNum |= clSetKernelArg(scan, 1, sizeof(cl_mem), &output_buffer);   // Output array
-    errNum |= clSetKernelArg(scan, 2, sizeof(cl_uint) /*TODO: HISTOSPLIT?*/, NULL);             // Local Scan
-//    errNum |= clSetKernelArg(scan, 3, sizeof(int), &arrlen);
+    errNum = clSetKernelArg(scan, 0, sizeof(cl_mem), &output_buffer);       // Input array
+    errNum |= clSetKernelArg(scan, 1, sizeof(cl_uint) * 128, NULL);         // Local Scan
 
     //Reorder arguments
     //TODO
@@ -271,18 +228,26 @@ int main() {
     
     errNum = clEnqueueNDRangeKernel(commandQueue, count, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL);
     if(!errNum == CL_SUCCESS){
-        printf("Count kernel terminated abruptly");
+        printf("Count kernel terminated abruptly\n");
         exit(1);
     }
     clFinish(commandQueue);
-/*
+
     errNum = clEnqueueNDRangeKernel(commandQueue, scan, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL);
     if(!errNum == CL_SUCCESS){
-        printf("Count kernel terminated abruptly");
+        printf("Scan kernel terminated abruptly\n");
+        switch(errNum) {
+            case CL_INVALID_KERNEL_ARGS:
+                printf("Invalid kernel args\n");
+                break;
+            default:
+                printf("Unspecified case\n");
+        }
+            
         exit(1);
     }
     clFinish(commandQueue);
-*/
+
 
     //-------------------
     // Enqueue host read (device buffer -> host)

@@ -64,11 +64,8 @@ __kernel void count(const __global int* input,
 
 
 /** SCAN KERNEL **/
-//TODO: Necesito output aca? Lo dejo por consistencia?
 __kernel void scan(__global int* input,
-                   __global int* output,
                    __local int* local_scan)
-//                   const int nkeys) Obsoleto?
 {
     uint g_id = (uint) get_global_id(0);
     uint l_id = (uint) get_local_id(0);
@@ -100,7 +97,7 @@ __kernel void scan(__global int* input,
     }
 
     //DOWN SWEEP
-    for(d = 1; d < l_size; d *= 2) {
+    for(d = 1; d < (l_size*2); d *= 2) {
         offset >>= 1;
         barrier(CLK_LOCAL_MEM_FENCE);
         if(l_id < d) {
@@ -114,7 +111,6 @@ __kernel void scan(__global int* input,
     barrier(CLK_LOCAL_MEM_FENCE);
 
     //Write results from Local to Global memory
-    //TODO: Write to output or leave in input?
     input[2 * g_id]     = local_scan[2 * l_id];
     input[2 * g_id + 1] = local_scan[2 * l_id + 1];
 }
