@@ -137,7 +137,7 @@ int main() {
     //Create input buff
     array_buffer = clCreateBuffer(context, CL_MEM_READ_WRITE, array_dataSize, NULL, &errNum);
     //Create output buff
-    output_buffer = clCreateBuffer(context, CL_MEM_READ_WRITE, array_dataSize, NULL, &errNum);
+    output_buffer = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(int) * BUCK * N_GROUPS * WG_SIZE, NULL, &errNum);
 
     //----------------------
     // Enqueue device write (host -> device buffer)
@@ -214,26 +214,28 @@ int main() {
     //Reorder arguments
     //TODO
 
-
-    //---------------------------------
-    // Configure work-item structuring
-    //---------------------------------
-    size_t globalWorkSize[1];
-    
-    globalWorkSize[0] = ARRLEN;
-
     //-------------------------------
     // Enqueue kernels for execution
     //-------------------------------
+    size_t globalWorkSize;
+    size_t localWorkSize;
     
-    errNum = clEnqueueNDRangeKernel(commandQueue, count, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL);
+    //Count
+    globalWorkSize = N_GROUPS * WG_SIZE;
+    localWorkSize = WG_SIZE;
+
+    errNum = clEnqueueNDRangeKernel(commandQueue, count, 1, NULL, &globalWorkSize, &localWorkSize, 0, NULL, NULL);
     if(!errNum == CL_SUCCESS){
         printf("Count kernel terminated abruptly\n");
         exit(1);
     }
     clFinish(commandQueue);
 
-    errNum = clEnqueueNDRangeKernel(commandQueue, scan, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL);
+    //Scan
+    globalWorkSize = N_GROUPS * WG_SIZE;
+    localWorkSize = WG_SIZE;
+
+    errNum = clEnqueueNDRangeKernel(commandQueue, scan, 1, NULL, &globalWorkSize, &localWorkSize, 0, NULL, NULL);
     if(!errNum == CL_SUCCESS){
         printf("Scan kernel terminated abruptly\n");
         switch(errNum) {

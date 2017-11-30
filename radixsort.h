@@ -28,9 +28,9 @@
 
 
 //Number of items in a work-group
-#define WG_SIZE 64
+#define WG_SIZE 2
 //Number of groups in a device
-#define N_GROUPS 16
+#define N_GROUPS 2
 
 
 //Number of total bits in the integers to sort
@@ -43,7 +43,7 @@
 
 /*Testing functions*/
 //Size of the array to order (if _RS_FILLFUN_ not defined, generateArray will create a random one).
-#define ARRLEN 64
+#define ARRLEN 8
 
 /*#define _RS_FILLFUN_ arraywithones()
 int* arraywithones(void)
@@ -55,4 +55,14 @@ int* arraywithones(void)
     return array;
 }
 */
+
+#define _RS_FILLFUN_ predefarray()
+int *predefarray(void) //define ARRLEN = 8
+{
+    int i, *array = malloc(sizeof(int) * ARRLEN);
+    int constarr[8] = {120,223,102,300,335,160,253,111};
+    for(i=0; i<ARRLEN; i++)
+        array[i] = constarr[i];
+    return array;
+}
 #endif /*_RADIXSORT_H_*/
