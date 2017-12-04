@@ -93,7 +93,7 @@ __kernel void scan(__global int* input,
         //output[g_id] = local_scan[l_size - 1];
 
         //Clear the last element
-        local_scan[l_size * 2] = 0;
+        local_scan[l_size * 2 - 1] = 0;
     }
 
     //DOWN SWEEP
@@ -113,4 +113,22 @@ __kernel void scan(__global int* input,
     //Write results from Local to Global memory
     input[2 * g_id]     = local_scan[2 * l_id];
     input[2 * g_id + 1] = local_scan[2 * l_id + 1];
+}
+
+
+/** COALESCE KERNEL **/
+__kernel void coalesce(__global int* scan,
+                       __global int* block_sums)
+{
+
+    uint g_id = (uint) get_global_id(0);
+    uint group_id = (uint) get_group_id(0);
+
+    int b = block_sums[group_id];
+
+    //TODO: Probar pasar a memoria local
+    scan[2 * g_id] += b;
+    scan[2 * g_id + 1] += b;
+
+    barrier(CLK_GLOBAL_MEM_FENCE);
 }
