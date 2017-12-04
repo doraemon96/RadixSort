@@ -133,11 +133,15 @@ int main() {
     //----------------
     cl_mem array_buffer;
     cl_mem output_buffer;
+    cl_mem block_sum;
 
     //Create input buff
     array_buffer = clCreateBuffer(context, CL_MEM_READ_WRITE, array_dataSize, NULL, &errNum);
     //Create output buff
     output_buffer = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(int) * BUCK * N_GROUPS * WG_SIZE, NULL, &errNum);
+    //Create block sum buff
+    block_sum = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(int) * N_GROUPS, NULL, &errNum);
+
 
     //----------------------
     // Enqueue device write (host -> device buffer)
@@ -182,7 +186,7 @@ int main() {
     // Create kernels
     //----------------
 
-    cl_kernel count, scan, reorder;
+    cl_kernel count, scan, coalesce, reorder;
     count = clCreateKernel(program, "count", &errNum);
     if(!errNum == CL_SUCCESS){
         printf("Error creating count kernel\n");
@@ -193,46 +197,55 @@ int main() {
         printf("Error creating scan kernel\n");
         exit(1);
     }
+    coalesce = clCreateKernel(program, "coalesce", &errNum);
+    if(!errNum == CL_SUCCESS){
+        printf("Error creating coalesce kernel\n");
+        exit(1);
+    }
+/*
+    reorder = clCreateKernel(program, "reorder", &errNum);
+    if(!errNum == CL_SUCCESS){
+        printf("Error creating reorder kernel\n");
+        exit(1);
+    }
+*/
 
-    //----------------------
-    // Set kernel arguments
-    //----------------------
+    //-------------------------------
+    // Enqueue kernels for execution
+    //-------------------------------
 
-    //Count arguments
+    size_t globalWorkSize;
+    size_t localWorkSize;
     int pass = 0;
     int arrlen = ARRLEN;
+
+    //Count arguments
     errNum = clSetKernelArg(count, 0, sizeof(cl_mem), &array_buffer);       // Input array /*TODO: Change with pass*/
     errNum |= clSetKernelArg(count, 1, sizeof(cl_mem), &output_buffer);     // Output array
     errNum |= clSetKernelArg(count, 2, sizeof(cl_uint)*BUCK*WG_SIZE, NULL); // Local Histogram
     errNum |= clSetKernelArg(count, 3, sizeof(int), &pass);                 // Pass number /*TODO: Change with pass*/
     errNum |= clSetKernelArg(count, 4, sizeof(int), &arrlen);               // Number of elements in array /*TODO: Round to power of 2*/
-
-    //Scan arguments
-    errNum = clSetKernelArg(scan, 0, sizeof(cl_mem), &output_buffer);       // Input array
-    errNum |= clSetKernelArg(scan, 1, sizeof(cl_uint) * 128, NULL);         // Local Scan
-
-    //Reorder arguments
-    //TODO
-
-    //-------------------------------
-    // Enqueue kernels for execution
-    //-------------------------------
-    size_t globalWorkSize;
-    size_t localWorkSize;
     
-    //Count
-    globalWorkSize = N_GROUPS * WG_SIZE;
-    localWorkSize = WG_SIZE;
-
     errNum = clEnqueueNDRangeKernel(commandQueue, count, 1, NULL, &globalWorkSize, &localWorkSize, 0, NULL, NULL);
     if(!errNum == CL_SUCCESS){
         printf("Count kernel terminated abruptly\n");
         exit(1);
     }
     clFinish(commandQueue);
+/*TODO: DEBUG, BORRAR O PONERLO EN UN IF*/
+    int* countput;
+    countput = (int*)malloc(array_dataSize);
+    errNum = clEnqueueReadBuffer(commandQueue, output_buffer, CL_TRUE, 0, array_dataSize, countput, 0, NULL, NULL);
+    clFinish(commandQueue);
+/*FIN DEBUG*/
 
-    //Scan
-    globalWorkSize = N_GROUPS * WG_SIZE;
+
+    //Scan arguments
+    errNum = clSetKernelArg(scan, 0, sizeof(cl_mem), &output_buffer);       // Input array
+    errNum |= clSetKernelArg(scan, 1, sizeof(cl_uint)*BUCK*WG_SIZE, NULL);  // Local Scan
+    errNum |= clSetKernelArg(scan, 2, sizeof(cl_uint), &block_sum);         // Block Sum
+
+    globalWorkSize = (BUCK * N_GROUPS * WG_SIZE) / 2;
     localWorkSize = WG_SIZE;
 
     errNum = clEnqueueNDRangeKernel(commandQueue, scan, 1, NULL, &globalWorkSize, &localWorkSize, 0, NULL, NULL);
@@ -249,6 +262,41 @@ int main() {
         exit(1);
     }
     clFinish(commandQueue);
+/*TODO: DEBUG, BORRAR O PONERLO EN UN IF*/
+    int* scanput;
+    scanput = (int*)malloc(array_dataSize);
+    errNum = clEnqueueReadBuffer(commandQueue, output_buffer, CL_TRUE, 0, array_dataSize, scanput, 0, NULL, NULL);
+    clFinish(commandQueue);
+/*FIN DEBUG*/
+
+
+    //Block Sum arguments
+    void* ptr = NULL;
+    errNum = clSetKernelArg(scan, 0, sizeof(cl_mem), &block_sum);           // Input array
+    errNum |= clSetKernelArg(scan, 1, sizeof(cl_uint)*128, NULL);           // Local Scan TODO: Cambiar el 128!
+    errNum |= clSetKernelArg(scan, 2, sizeof(cl_mem), ptr);               // Block Sum TODO: No hace falta, hay que ponerlo igual?
+/*TODO: DEBUG, BORRAR O PONERLO EN UN IF*/
+    int* blockput;
+    blockput = (int*)malloc(array_dataSize);
+    errNum = clEnqueueReadBuffer(commandQueue, block_sum, CL_TRUE, 0, array_dataSize, blockput, 0, NULL, NULL);
+    clFinish(commandQueue);
+/*FIN DEBUG*/
+
+
+    //Coalesce arguments
+    errNum = clSetKernelArg(coalesce, 0, sizeof(cl_mem), &output_buffer);   // Scan array
+    errNum = clSetKernelArg(coalesce, 1, sizeof(cl_mem), &block_sum);       // Block reductions
+/*TODO: DEBUG, BORRAR O PONERLO EN UN IF*/
+    int* coalput;
+    coalput = (int*)malloc(array_dataSize);
+    errNum = clEnqueueReadBuffer(commandQueue, output_buffer, CL_TRUE, 0, array_dataSize, coalput, 0, NULL, NULL);
+    clFinish(commandQueue);
+/*FIN DEBUG*/
+
+
+    //Reorder arguments
+    //TODO
+
 
 
     //-------------------
@@ -266,14 +314,34 @@ int main() {
     //******************+TESTING+**********************
     
     int k;
+    printf("Arreglo Original:\n");
     for(k=0; k<ARRLEN; k++) {
         printf("[%d]", array[k]);
     }
     printf("\n\n");
+    printf("Resultado Count:");
     for(k=0; k<ARRLEN; k++) {
-        printf("[%d]", output[k]);
+        printf("[%d]", countput[k]);
     }
     printf("\n\n");
+    printf("Resultado Scan:");
+    for(k=0; k<ARRLEN; k++) {
+        printf("[%d]", scanput[k]);
+    }
+    printf("\n\n");
+    printf("Resultado Block Sum:");
+    for(k=0; k<ARRLEN; k++) {
+        printf("[%d]", blockput[k]);
+    }
+    printf("\n\n");
+
+
+    printf("Resultado Coalesce:");
+    for(k=0; k<ARRLEN; k++) {
+        printf("[%d]", coalput[k]);
+    }
+    printf("\n\n");
+
 
     //******************-TESTING-**********************
 
