@@ -284,6 +284,10 @@ int main() {
     errNum = clSetKernelArg(scan, 0, sizeof(cl_mem), &block_sum);           // Input array
     errNum |= clSetKernelArg(scan, 1, sizeof(cl_uint)*N_GROUPS, NULL);      // Local Scan TODO: Es N_GROUPS NO ?!
     errNum |= clSetKernelArg(scan, 2, sizeof(cl_mem), ptr);                 // Block Sum
+    if(!errNum == CL_SUCCESS){
+        printf("Block Sum kernel terminated abruptly\n");
+        exit(1);
+    }
     clFinish(commandQueue);
 /*TODO: DEBUG, BORRAR O PONERLO EN UN IF*/
     int* blockput;
@@ -299,6 +303,10 @@ int main() {
 
     errNum = clSetKernelArg(coalesce, 0, sizeof(cl_mem), &output_buffer);   // Scan array
     errNum = clSetKernelArg(coalesce, 1, sizeof(cl_mem), &block_sum);       // Block reductions
+    if(!errNum == CL_SUCCESS){
+        printf("Coalesce kernel terminated abruptly\n");
+        exit(1);
+    }
     clFinish(commandQueue);
 /*TODO: DEBUG, BORRAR O PONERLO EN UN IF*/
     int* coalput;

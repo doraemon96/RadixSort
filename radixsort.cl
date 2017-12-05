@@ -72,6 +72,7 @@ __kernel void scan(__global int* input,
     uint l_id = (uint) get_local_id(0);
     uint l_size = (uint) get_local_size(0);    
 
+    uint group_id = (uint) get_group_id(0);
     uint n_groups = (uint) get_num_groups(0); 
 
     //UP SWEEP
@@ -91,7 +92,7 @@ __kernel void scan(__global int* input,
     
     if (l_id == 0) {
         //Store the full sum on last item
-        block_sum[g_id] = local_scan[l_size * 2 - 1];
+        block_sum[group_id] = local_scan[l_size * 2 - 1];
 
         //Clear the last element
         local_scan[l_size * 2 - 1] = 0;
