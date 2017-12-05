@@ -220,6 +220,9 @@ int main() {
     int arrlen = ARRLEN;
 
     //Count arguments
+    globalWorkSize = N_GROUPS * WG_SIZE;
+    localWorkSize = WG_SIZE;
+
     errNum = clSetKernelArg(count, 0, sizeof(cl_mem), &array_buffer);       // Input array /*TODO: Change with pass*/
     errNum |= clSetKernelArg(count, 1, sizeof(cl_mem), &output_buffer);     // Output array
     errNum |= clSetKernelArg(count, 2, sizeof(cl_uint)*BUCK*WG_SIZE, NULL); // Local Histogram
@@ -241,12 +244,12 @@ int main() {
 
 
     //Scan arguments
-    errNum = clSetKernelArg(scan, 0, sizeof(cl_mem), &output_buffer);       // Input array
-    errNum |= clSetKernelArg(scan, 1, sizeof(cl_uint)*BUCK*WG_SIZE, NULL);  // Local Scan
-    errNum |= clSetKernelArg(scan, 2, sizeof(cl_uint), &block_sum);         // Block Sum
-
     globalWorkSize = (BUCK * N_GROUPS * WG_SIZE) / 2;
     localWorkSize = WG_SIZE;
+
+    errNum = clSetKernelArg(scan, 0, sizeof(cl_mem), &output_buffer);       // Input array
+    errNum |= clSetKernelArg(scan, 1, sizeof(cl_uint)*BUCK*WG_SIZE, NULL);  // Local Scan
+    errNum |= clSetKernelArg(scan, 2, sizeof(cl_mem), &block_sum);         // Block Sum
 
     errNum = clEnqueueNDRangeKernel(commandQueue, scan, 1, NULL, &globalWorkSize, &localWorkSize, 0, NULL, NULL);
     if(!errNum == CL_SUCCESS){
@@ -266,26 +269,37 @@ int main() {
     int* scanput;
     scanput = (int*)malloc(array_dataSize);
     errNum = clEnqueueReadBuffer(commandQueue, output_buffer, CL_TRUE, 0, array_dataSize, scanput, 0, NULL, NULL);
+    int* oblockput;
+    oblockput = (int*)malloc(sizeof(int)*N_GROUPS);
+    errNum = clEnqueueReadBuffer(commandQueue, block_sum, CL_TRUE, 0, sizeof(int)*N_GROUPS, oblockput, 0, NULL, NULL);
     clFinish(commandQueue);
 /*FIN DEBUG*/
 
 
     //Block Sum arguments
+    globalWorkSize = N_GROUPS / 2; //TODO: Para gian: porque en el scan haciamos una suma cada 2
+    localWorkSize = N_GROUPS / 2;  //TODO:            y necesitamos un unico scan final, por eso el grupo es unico
+
     void* ptr = NULL;
     errNum = clSetKernelArg(scan, 0, sizeof(cl_mem), &block_sum);           // Input array
-    errNum |= clSetKernelArg(scan, 1, sizeof(cl_uint)*128, NULL);           // Local Scan TODO: Cambiar el 128!
-    errNum |= clSetKernelArg(scan, 2, sizeof(cl_mem), ptr);               // Block Sum TODO: No hace falta, hay que ponerlo igual?
+    errNum |= clSetKernelArg(scan, 1, sizeof(cl_uint)*N_GROUPS, NULL);      // Local Scan TODO: Es N_GROUPS NO ?!
+    errNum |= clSetKernelArg(scan, 2, sizeof(cl_mem), ptr);                 // Block Sum
+    clFinish(commandQueue);
 /*TODO: DEBUG, BORRAR O PONERLO EN UN IF*/
     int* blockput;
     blockput = (int*)malloc(array_dataSize);
-    errNum = clEnqueueReadBuffer(commandQueue, block_sum, CL_TRUE, 0, array_dataSize, blockput, 0, NULL, NULL);
+    errNum = clEnqueueReadBuffer(commandQueue, block_sum, CL_TRUE, 0, sizeof(int)*N_GROUPS, blockput, 0, NULL, NULL);
     clFinish(commandQueue);
 /*FIN DEBUG*/
 
 
     //Coalesce arguments
+    globalWorkSize = (BUCK * N_GROUPS * WG_SIZE) / 2;
+    localWorkSize = WG_SIZE;
+
     errNum = clSetKernelArg(coalesce, 0, sizeof(cl_mem), &output_buffer);   // Scan array
     errNum = clSetKernelArg(coalesce, 1, sizeof(cl_mem), &block_sum);       // Block reductions
+    clFinish(commandQueue);
 /*TODO: DEBUG, BORRAR O PONERLO EN UN IF*/
     int* coalput;
     coalput = (int*)malloc(array_dataSize);
@@ -329,13 +343,16 @@ int main() {
         printf("[%d]", scanput[k]);
     }
     printf("\n\n");
+    printf("Resultado Block Array:");
+    for(k=0; k<N_GROUPS; k++) {
+        printf("[%d]", oblockput[k]);
+    }
+    printf("\n\n");
     printf("Resultado Block Sum:");
-    for(k=0; k<ARRLEN; k++) {
+    for(k=0; k<N_GROUPS; k++) {
         printf("[%d]", blockput[k]);
     }
     printf("\n\n");
-
-
     printf("Resultado Coalesce:");
     for(k=0; k<ARRLEN; k++) {
         printf("[%d]", coalput[k]);

@@ -65,7 +65,8 @@ __kernel void count(const __global int* input,
 
 /** SCAN KERNEL **/
 __kernel void scan(__global int* input,
-                   __local int* local_scan)
+                   __local int* local_scan,
+                   __global int* block_sum)
 {
     uint g_id = (uint) get_global_id(0);
     uint l_id = (uint) get_local_id(0);
@@ -90,7 +91,7 @@ __kernel void scan(__global int* input,
     
     if (l_id == 0) {
         //Store the full sum on last item
-        //output[g_id] = local_scan[l_size - 1];
+        block_sum[g_id] = local_scan[l_size * 2 - 1];
 
         //Clear the last element
         local_scan[l_size * 2 - 1] = 0;
