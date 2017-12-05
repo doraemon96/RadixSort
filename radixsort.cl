@@ -75,10 +75,11 @@ __kernel void scan(__global int* input,
     uint group_id = (uint) get_group_id(0);
     uint n_groups = (uint) get_num_groups(0); 
 
-    //UP SWEEP
+    //Store data from global to local memory to operate
     local_scan[2 * l_id] = input[2 * g_id];
     local_scan[2 * l_id + 1] = input[2 * g_id + 1];
 
+    //UP SWEEP
     int d, offset = 1;
     for(d = l_size; d > 0; d >>= 1){
         barrier(CLK_LOCAL_MEM_FENCE);
@@ -92,7 +93,9 @@ __kernel void scan(__global int* input,
     
     if (l_id == 0) {
         //Store the full sum on last item
-        block_sum[group_id] = local_scan[l_size * 2 - 1];
+        if(block_sum != NULL){
+            block_sum[group_id] = local_scan[l_size * 2 - 1];
+        }
 
         //Clear the last element
         local_scan[l_size * 2 - 1] = 0;

@@ -278,12 +278,14 @@ int main() {
 
     //Block Sum arguments
     globalWorkSize = N_GROUPS / 2; //TODO: Para gian: porque en el scan haciamos una suma cada 2
-    localWorkSize = N_GROUPS / 2;  //TODO:            y necesitamos un unico scan final, por eso el grupo es unico
+    localWorkSize =  N_GROUPS / 2; //TODO:         y necesitamos un unico scan final, por eso el grupo es unico
 
     void* ptr = NULL;
     errNum = clSetKernelArg(scan, 0, sizeof(cl_mem), &block_sum);           // Input array
     errNum |= clSetKernelArg(scan, 1, sizeof(cl_uint)*N_GROUPS, NULL);      // Local Scan TODO: Es N_GROUPS NO ?!
     errNum |= clSetKernelArg(scan, 2, sizeof(cl_mem), ptr);                 // Block Sum
+
+    errNum = clEnqueueNDRangeKernel(commandQueue, scan, 1, NULL, &globalWorkSize, &localWorkSize, 0, NULL, NULL);
     if(!errNum == CL_SUCCESS){
         printf("Block Sum kernel terminated abruptly\n");
         exit(1);
@@ -303,6 +305,8 @@ int main() {
 
     errNum = clSetKernelArg(coalesce, 0, sizeof(cl_mem), &output_buffer);   // Scan array
     errNum = clSetKernelArg(coalesce, 1, sizeof(cl_mem), &block_sum);       // Block reductions
+
+    errNum = clEnqueueNDRangeKernel(commandQueue, coalesce, 1, NULL, &globalWorkSize, &localWorkSize, 0, NULL, NULL);
     if(!errNum == CL_SUCCESS){
         printf("Coalesce kernel terminated abruptly\n");
         exit(1);
