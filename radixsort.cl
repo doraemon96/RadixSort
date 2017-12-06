@@ -43,7 +43,7 @@ __kernel void count(const __global int* input,
     for(i = 0; i < size; i++) {
         int key = input[i + start];
         //Extract the corresponding radix of the key
-        key = (key >> (pass * RADIX)) & (BUCK - 1);
+        key = ((key >> (pass * RADIX)) & (BUCK - 1));
         //Count the ocurrences in the corresponding bucket
         local_histo[key * l_size + l_id]++;
     }

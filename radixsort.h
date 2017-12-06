@@ -38,7 +38,7 @@
 //Number of buckets necessary
 #define BUCK (1 << RADIX)
 //Number of bits in the radix
-#define RADIX 3
+#define RADIX 1
 
 
 /*Testing functions*/
