@@ -225,7 +225,7 @@ int main() {
 
     errNum = clSetKernelArg(count, 0, sizeof(cl_mem), &array_buffer);       // Input array /*TODO: Change with pass*/
     errNum |= clSetKernelArg(count, 1, sizeof(cl_mem), &output_buffer);     // Output array
-    errNum |= clSetKernelArg(count, 2, sizeof(cl_uint)*BUCK*WG_SIZE, NULL); // Local Histogram
+    errNum |= clSetKernelArg(count, 2, sizeof(int)*BUCK*WG_SIZE, NULL); // Local Histogram
     errNum |= clSetKernelArg(count, 3, sizeof(int), &pass);                 // Pass number /*TODO: Change with pass*/
     errNum |= clSetKernelArg(count, 4, sizeof(int), &arrlen);               // Number of elements in array /*TODO: Round to power of 2*/
     
@@ -237,18 +237,18 @@ int main() {
     clFinish(commandQueue);
 /*TODO: DEBUG, BORRAR O PONERLO EN UN IF*/
     int* countput;
-    countput = (int*)malloc(array_dataSize);
-    errNum = clEnqueueReadBuffer(commandQueue, output_buffer, CL_TRUE, 0, array_dataSize, countput, 0, NULL, NULL);
+    countput = (int*)malloc(sizeof(int)*BUCK*WG_SIZE*N_GROUPS);
+    errNum = clEnqueueReadBuffer(commandQueue, output_buffer, CL_TRUE, 0, sizeof(int)*BUCK*WG_SIZE*N_GROUPS, countput, 0, NULL, NULL);
     clFinish(commandQueue);
 /*FIN DEBUG*/
 
 
     //Scan arguments
     globalWorkSize = (BUCK * N_GROUPS * WG_SIZE) / 2;
-    localWorkSize = WG_SIZE;
+    localWorkSize = globalWorkSize / N_GROUPS;
 
     errNum = clSetKernelArg(scan, 0, sizeof(cl_mem), &output_buffer);       // Input array
-    errNum |= clSetKernelArg(scan, 1, sizeof(cl_uint)*BUCK*WG_SIZE, NULL);  // Local Scan
+    errNum |= clSetKernelArg(scan, 1, sizeof(int)*BUCK*WG_SIZE, NULL);  // Local Scan
     errNum |= clSetKernelArg(scan, 2, sizeof(cl_mem), &block_sum);         // Block Sum
 
     errNum = clEnqueueNDRangeKernel(commandQueue, scan, 1, NULL, &globalWorkSize, &localWorkSize, 0, NULL, NULL);
@@ -267,8 +267,8 @@ int main() {
     clFinish(commandQueue);
 /*TODO: DEBUG, BORRAR O PONERLO EN UN IF*/
     int* scanput;
-    scanput = (int*)malloc(array_dataSize);
-    errNum = clEnqueueReadBuffer(commandQueue, output_buffer, CL_TRUE, 0, array_dataSize, scanput, 0, NULL, NULL);
+    scanput = (int*)malloc(sizeof(int)*BUCK*WG_SIZE*N_GROUPS);
+    errNum = clEnqueueReadBuffer(commandQueue, output_buffer, CL_TRUE, 0, sizeof(int)*BUCK*WG_SIZE*N_GROUPS, scanput, 0, NULL, NULL);
     int* oblockput;
     oblockput = (int*)malloc(sizeof(int)*N_GROUPS);
     errNum = clEnqueueReadBuffer(commandQueue, block_sum, CL_TRUE, 0, sizeof(int)*N_GROUPS, oblockput, 0, NULL, NULL);
@@ -282,7 +282,7 @@ int main() {
 
     void* ptr = NULL;
     errNum = clSetKernelArg(scan, 0, sizeof(cl_mem), &block_sum);           // Input array
-    errNum |= clSetKernelArg(scan, 1, sizeof(cl_uint)*N_GROUPS, NULL);      // Local Scan TODO: Es N_GROUPS NO ?!
+    errNum |= clSetKernelArg(scan, 1, sizeof(int)*N_GROUPS, NULL);      // Local Scan TODO: Es N_GROUPS NO ?!
     errNum |= clSetKernelArg(scan, 2, sizeof(cl_mem), ptr);                 // Block Sum
 
     errNum = clEnqueueNDRangeKernel(commandQueue, scan, 1, NULL, &globalWorkSize, &localWorkSize, 0, NULL, NULL);
@@ -293,7 +293,7 @@ int main() {
     clFinish(commandQueue);
 /*TODO: DEBUG, BORRAR O PONERLO EN UN IF*/
     int* blockput;
-    blockput = (int*)malloc(array_dataSize);
+    blockput = (int*)malloc(sizeof(int)*N_GROUPS);
     errNum = clEnqueueReadBuffer(commandQueue, block_sum, CL_TRUE, 0, sizeof(int)*N_GROUPS, blockput, 0, NULL, NULL);
     clFinish(commandQueue);
 /*FIN DEBUG*/
@@ -301,7 +301,7 @@ int main() {
 
     //Coalesce arguments
     globalWorkSize = (BUCK * N_GROUPS * WG_SIZE) / 2;
-    localWorkSize = WG_SIZE;
+    localWorkSize = globalWorkSize / N_GROUPS;
 
     errNum = clSetKernelArg(coalesce, 0, sizeof(cl_mem), &output_buffer);   // Scan array
     errNum = clSetKernelArg(coalesce, 1, sizeof(cl_mem), &block_sum);       // Block reductions
@@ -314,8 +314,8 @@ int main() {
     clFinish(commandQueue);
 /*TODO: DEBUG, BORRAR O PONERLO EN UN IF*/
     int* coalput;
-    coalput = (int*)malloc(array_dataSize);
-    errNum = clEnqueueReadBuffer(commandQueue, output_buffer, CL_TRUE, 0, array_dataSize, coalput, 0, NULL, NULL);
+    coalput = (int*)malloc(sizeof(int)*BUCK*WG_SIZE*N_GROUPS);
+    errNum = clEnqueueReadBuffer(commandQueue, output_buffer, CL_TRUE, 0, sizeof(int)*BUCK*WG_SIZE*N_GROUPS, coalput, 0, NULL, NULL);
     clFinish(commandQueue);
 /*FIN DEBUG*/
 
@@ -346,12 +346,12 @@ int main() {
     }
     printf("\n\n");
     printf("Resultado Count:");
-    for(k=0; k<ARRLEN; k++) {
+    for(k=0; k<BUCK*WG_SIZE*N_GROUPS; k++) {
         printf("[%d]", countput[k]);
     }
     printf("\n\n");
     printf("Resultado Scan:");
-    for(k=0; k<ARRLEN; k++) {
+    for(k=0; k<BUCK*WG_SIZE*N_GROUPS; k++) {
         printf("[%d]", scanput[k]);
     }
     printf("\n\n");
@@ -366,7 +366,7 @@ int main() {
     }
     printf("\n\n");
     printf("Resultado Coalesce:");
-    for(k=0; k<ARRLEN; k++) {
+    for(k=0; k<BUCK*WG_SIZE*N_GROUPS; k++) {
         printf("[%d]", coalput[k]);
     }
     printf("\n\n");

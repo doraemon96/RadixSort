@@ -62,7 +62,6 @@ __kernel void count(const __global int* input,
     barrier(CLK_GLOBAL_MEM_FENCE);
 }
 
-
 /** SCAN KERNEL **/
 __kernel void scan(__global int* input,
                    __local int* local_scan,
@@ -137,3 +136,37 @@ __kernel void coalesce(__global int* scan,
 
     barrier(CLK_GLOBAL_MEM_FENCE);
 }
+
+
+
+/** REORDER KERNEL **/
+/*
+__kernel void reorder(__global int* array,
+                      __global int* histo
+                      __local int* local_histo)
+{
+    uint g_id = (uint) get_global_id(0);
+    uint l_id = (uint) get_local_id(0);
+    uint l_size = (uint) get_local_size(0);    
+
+    uint group_id = (uint) get_group_id(0);
+    uint n_groups = (uint) get_num_groups(0); 
+
+    //Bring histo to local memory
+    int size = (nkeys / ngroups) / l_size;
+    int start = g_id * size;
+    
+    int i, to;
+    for(i = 0; i < size; i++){
+        to = i * n_groups + group_id
+        local_histo[i * l_size + l_id] = 
+            histo[l_size * to + l_id];
+    }
+    
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    //Write to global memory in order
+    //TODO
+
+}
+*/

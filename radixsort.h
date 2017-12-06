@@ -38,7 +38,7 @@
 //Number of buckets necessary
 #define BUCK (1 << RADIX)
 //Number of bits in the radix
-#define RADIX 1
+#define RADIX 3
 
 
 /*Testing functions*/
@@ -60,7 +60,7 @@ int* arraywithones(void)
 int *predefarray(void) //define ARRLEN = 8
 {
     int i, *array = malloc(sizeof(int) * ARRLEN);
-    int constarr[8] = {120,223,102,300,335,160,253,111};
+    int constarr[8] = {120,160,102,300,335,223,253,111};
     for(i=0; i<ARRLEN; i++)
         array[i] = constarr[i];
     return array;
