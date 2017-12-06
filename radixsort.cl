@@ -43,7 +43,7 @@ __kernel void count(const __global int* input,
     for(i = 0; i < size; i++) {
         int key = input[i + start];
         //Extract the corresponding radix of the key
-        key = ((key >> (pass * RADIX)) & (BUCK - 1));
+        key = (key >> (pass * RADIX)) & (BUCK - 1);
         //Count the ocurrences in the corresponding bucket
         local_histo[key * l_size + l_id]++;
     }
@@ -140,9 +140,11 @@ __kernel void coalesce(__global int* scan,
 
 
 /** REORDER KERNEL **/
-/*
 __kernel void reorder(__global int* array,
-                      __global int* histo
+                      __global int* histo,
+                      __global int* output,
+                      const int pass,
+                      const int nkeys,
                       __local int* local_histo)
 {
     uint g_id = (uint) get_global_id(0);
@@ -153,12 +155,9 @@ __kernel void reorder(__global int* array,
     uint n_groups = (uint) get_num_groups(0); 
 
     //Bring histo to local memory
-    int size = (nkeys / ngroups) / l_size;
-    int start = g_id * size;
-    
-    int i, to;
-    for(i = 0; i < size; i++){
-        to = i * n_groups + group_id
+    int i;
+    for(i = 0; i < BUCK; i++){
+        int to = i * n_groups + group_id;
         local_histo[i * l_size + l_id] = 
             histo[l_size * to + l_id];
     }
@@ -166,7 +165,17 @@ __kernel void reorder(__global int* array,
     barrier(CLK_LOCAL_MEM_FENCE);
 
     //Write to global memory in order
-    //TODO
+    int size = (nkeys / n_groups) / l_size;
+    int start = g_id * size;
 
+    for(i = 0; i < size; i++){
+        int item = array[i + start];
+        int key = (item >> (pass * RADIX)) & (BUCK - 1);
+        int pos = local_histo[key * l_size + l_id];
+        local_histo[key * l_size + l_id]++;
+
+        output[pos] = item;
+    }
+    
+    barrier(CLK_GLOBAL_MEM_FENCE);
 }
-*/

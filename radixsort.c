@@ -51,14 +51,12 @@ int main() {
     // Initialize host data
     //----------------------
     int *array = NULL; //Input array
-    int *output = NULL; //Output array
     
     //Data array size
     size_t array_dataSize = sizeof(int)*ARRLEN;
 
     //Allocate space for the arrays
     array = (int*)malloc(array_dataSize);
-    output = (int*)malloc(array_dataSize);
 
     //Initialize array data
     array = _RS_FILLFUN_;
@@ -134,6 +132,7 @@ int main() {
     cl_mem array_buffer;
     cl_mem output_buffer;
     cl_mem block_sum;
+    cl_mem output_buffer_final;
 
     //Create input buff
     array_buffer = clCreateBuffer(context, CL_MEM_READ_WRITE, array_dataSize, NULL, &errNum);
@@ -141,6 +140,8 @@ int main() {
     output_buffer = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(int) * BUCK * N_GROUPS * WG_SIZE, NULL, &errNum);
     //Create block sum buff
     block_sum = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(int) * N_GROUPS, NULL, &errNum);
+    //Create final output buff
+    output_buffer_final = clCreateBuffer(context, CL_MEM_READ_WRITE, array_dataSize, NULL, &errNum);
 
 
     //----------------------
@@ -202,13 +203,11 @@ int main() {
         printf("Error creating coalesce kernel\n");
         exit(1);
     }
-/*
     reorder = clCreateKernel(program, "reorder", &errNum);
     if(!errNum == CL_SUCCESS){
         printf("Error creating reorder kernel\n");
         exit(1);
     }
-*/
 
     //-------------------------------
     // Enqueue kernels for execution
@@ -321,7 +320,36 @@ int main() {
 
 
     //Reorder arguments
-    //TODO
+    globalWorkSize = N_GROUPS * WG_SIZE;
+    localWorkSize = WG_SIZE;
+
+    errNum = clSetKernelArg(reorder, 0, sizeof(cl_mem), &array_buffer);     // Input array /*TODO: Change with pass*/
+    errNum |= clSetKernelArg(reorder, 1, sizeof(cl_mem), &output_buffer);     
+    errNum |= clSetKernelArg(reorder, 2, sizeof(cl_mem), &output_buffer_final);
+    errNum |= clSetKernelArg(reorder, 3, sizeof(int), &pass);                 // Pass number /*TODO: Change with pass*/
+    errNum |= clSetKernelArg(reorder, 4, sizeof(int), &arrlen);               // Number of elements in array /*TODO: Round to power of 2*/
+    errNum |= clSetKernelArg(reorder, 5, sizeof(int)*BUCK*WG_SIZE, NULL);     // Local Histogram
+    
+    errNum = clEnqueueNDRangeKernel(commandQueue, reorder, 1, NULL, &globalWorkSize, &localWorkSize, 0, NULL, NULL);
+    if(!errNum == CL_SUCCESS){
+        printf("Reorder kernel terminated abruptly\n");
+        switch(errNum) {
+            case CL_INVALID_KERNEL_ARGS:
+                printf("Invalid kernel args\n");
+                break;
+            default:
+                printf("Unspecified case\n");
+        }
+            
+        exit(1);
+    }
+    clFinish(commandQueue);
+/*TODO: DEBUG, BORRAR O PONERLO EN UN IF*/
+    int* output;
+    output = (int*)malloc(array_dataSize);
+    errNum = clEnqueueReadBuffer(commandQueue, output_buffer_final, CL_TRUE, 0, array_dataSize, output, 0, NULL, NULL);
+    clFinish(commandQueue);
+/*FIN DEBUG*/
 
 
 
@@ -368,6 +396,11 @@ int main() {
     printf("Resultado Coalesce:");
     for(k=0; k<BUCK*WG_SIZE*N_GROUPS; k++) {
         printf("[%d]", coalput[k]);
+    }
+    printf("\n\n");
+    printf("Resultado Ordenado:");
+    for(k=0; k<ARRLEN; k++) {
+        printf("[%d]", output[k]);
     }
     printf("\n\n");
 
