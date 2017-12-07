@@ -204,7 +204,7 @@ int main() {
     // Create kernels
     //----------------
 
-    cl_kernel count, scan, coalesce, reorder;
+    cl_kernel count, scan, blocksum, coalesce, reorder;
     count = clCreateKernel(program, "count", &errNum);
     if(!errNum == CL_SUCCESS){
         printf("Error creating count kernel\n");
@@ -213,6 +213,11 @@ int main() {
     scan = clCreateKernel(program, "scan", &errNum);
     if(!errNum == CL_SUCCESS){
         printf("Error creating scan kernel\n");
+        exit(1);
+    }
+    blocksum = clCreateKernel(program, "scan", &errNum);
+    if(!errNum == CL_SUCCESS){
+        printf("Error creating blocksum kernel\n");
         exit(1);
     }
     coalesce = clCreateKernel(program, "coalesce", &errNum);
@@ -225,20 +230,6 @@ int main() {
         printf("Error creating reorder kernel\n");
         exit(1);
     }
-
-    //-------------------------------
-    // Set fixed kernel arguments
-    //-------------------------------
-    
-    //Count fixed args
-
-    //Scan fixed args
-
-    //BlockSum fixed args
-
-    //Coalesce fixed args
-
-    //Reorder fixed args
 
 
     //-------------------------------
@@ -312,11 +303,11 @@ int main() {
     localWorkSize =  N_GROUPS / 2; //TODO:         y necesitamos un unico scan final, por eso el grupo es unico
 
     void* ptr = NULL;
-    errNum = clSetKernelArg(scan, 0, sizeof(cl_mem), &blocksum_buffer);      // Input array
-    errNum |= clSetKernelArg(scan, 1, sizeof(int)*N_GROUPS, NULL);     // Local Scan TODO: Es N_GROUPS NO ?!
-    errNum |= clSetKernelArg(scan, 2, sizeof(cl_mem), ptr);            // Block Sum
+    errNum = clSetKernelArg(blocksum, 0, sizeof(cl_mem), &blocksum_buffer);      // Input array
+    errNum |= clSetKernelArg(blocksum, 1, sizeof(int)*N_GROUPS, NULL);     // Local Scan TODO: Es N_GROUPS NO ?!
+    errNum |= clSetKernelArg(blocksum, 2, sizeof(cl_mem), ptr);            // Block Sum
 
-    errNum = clEnqueueNDRangeKernel(commandQueue, scan, 1, NULL, &globalWorkSize, &localWorkSize, 0, NULL, NULL);
+    errNum = clEnqueueNDRangeKernel(commandQueue, blocksum, 1, NULL, &globalWorkSize, &localWorkSize, 0, NULL, NULL);
     if(!errNum == CL_SUCCESS){
         printf("Block Sum kernel terminated abruptly\n");
         exit(1);
@@ -439,6 +430,7 @@ int main() {
     //openCL
     clReleaseKernel(count);
     clReleaseKernel(scan);
+    clReleaseKernel(blocksum);
     clReleaseKernel(coalesce);
     clReleaseKernel(reorder);
 
