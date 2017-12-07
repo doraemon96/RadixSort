@@ -66,12 +66,14 @@ int main() {
     // Initialize host data
     //----------------------
     int *array = NULL; //Input array
+    int *output = NULL; //Output array
     
     //Data array size
     size_t array_dataSize = sizeof(int)*ARRLEN;
 
     //Allocate space for the arrays
     array = (int*)malloc(array_dataSize);
+    output = (int*)malloc(array_dataSize);
 
     //Initialize array data
     array = _RS_FILLFUN_;
@@ -145,18 +147,18 @@ int main() {
     // Create buffers
     //----------------
     cl_mem array_buffer;
+    cl_mem histo_buffer;
+    cl_mem blocksum_buffer;
     cl_mem output_buffer;
-    cl_mem block_sum;
-    cl_mem output_buffer_final;
 
     //Create input buff
     array_buffer = clCreateBuffer(context, CL_MEM_READ_WRITE, array_dataSize, NULL, &errNum);
     //Create output buff
-    output_buffer = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(int) * BUCK * N_GROUPS * WG_SIZE, NULL, &errNum);
+    histo_buffer = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(int) * BUCK * N_GROUPS * WG_SIZE, NULL, &errNum);
     //Create block sum buff
-    block_sum = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(int) * N_GROUPS, NULL, &errNum);
+    blocksum_buffer = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(int) * N_GROUPS, NULL, &errNum);
     //Create final output buff
-    output_buffer_final = clCreateBuffer(context, CL_MEM_READ_WRITE, array_dataSize, NULL, &errNum);
+    output_buffer = clCreateBuffer(context, CL_MEM_READ_WRITE, array_dataSize, NULL, &errNum);
 
 
     //----------------------
@@ -225,6 +227,21 @@ int main() {
     }
 
     //-------------------------------
+    // Set fixed kernel arguments
+    //-------------------------------
+    
+    //Count fixed args
+
+    //Scan fixed args
+
+    //BlockSum fixed args
+
+    //Coalesce fixed args
+
+    //Reorder fixed args
+
+
+    //-------------------------------
     // Enqueue kernels for execution
     //-------------------------------
 
@@ -238,7 +255,7 @@ int main() {
     localWorkSize = WG_SIZE;
 
     errNum = clSetKernelArg(count, 0, sizeof(cl_mem), &array_buffer);       // Input array /*TODO: Change with pass*/
-    errNum |= clSetKernelArg(count, 1, sizeof(cl_mem), &output_buffer);     // Output array
+    errNum |= clSetKernelArg(count, 1, sizeof(cl_mem), &histo_buffer);     // Output array
     errNum |= clSetKernelArg(count, 2, sizeof(int)*BUCK*WG_SIZE, NULL);     // Local Histogram
     errNum |= clSetKernelArg(count, 3, sizeof(int), &pass);                 // Pass number /*TODO: Change with pass*/
     errNum |= clSetKernelArg(count, 4, sizeof(int), &arrlen);               // Number of elements in array /*TODO: Round to power of 2*/
@@ -252,7 +269,7 @@ int main() {
 /*TODO: DEBUG, BORRAR O PONERLO EN UN IF*/
     int* countput;
     countput = (int*)malloc(sizeof(int)*BUCK*WG_SIZE*N_GROUPS);
-    errNum = clEnqueueReadBuffer(commandQueue, output_buffer, CL_TRUE, 0, sizeof(int)*BUCK*WG_SIZE*N_GROUPS, countput, 0, NULL, NULL);
+    errNum = clEnqueueReadBuffer(commandQueue, histo_buffer, CL_TRUE, 0, sizeof(int)*BUCK*WG_SIZE*N_GROUPS, countput, 0, NULL, NULL);
     clFinish(commandQueue);
 /*FIN DEBUG*/
 
@@ -261,9 +278,9 @@ int main() {
     globalWorkSize = (BUCK * N_GROUPS * WG_SIZE) / 2;
     localWorkSize = globalWorkSize / N_GROUPS;
 
-    errNum = clSetKernelArg(scan, 0, sizeof(cl_mem), &output_buffer);      // Input array
+    errNum = clSetKernelArg(scan, 0, sizeof(cl_mem), &histo_buffer);      // Input array
     errNum |= clSetKernelArg(scan, 1, sizeof(int)*BUCK*WG_SIZE, NULL);     // Local Scan
-    errNum |= clSetKernelArg(scan, 2, sizeof(cl_mem), &block_sum);         // Block Sum
+    errNum |= clSetKernelArg(scan, 2, sizeof(cl_mem), &blocksum_buffer);         // Block Sum
 
     errNum = clEnqueueNDRangeKernel(commandQueue, scan, 1, NULL, &globalWorkSize, &localWorkSize, 0, NULL, NULL);
     if(!errNum == CL_SUCCESS){
@@ -282,10 +299,10 @@ int main() {
 /*TODO: DEBUG, BORRAR O PONERLO EN UN IF*/
     int* scanput;
     scanput = (int*)malloc(sizeof(int)*BUCK*WG_SIZE*N_GROUPS);
-    errNum = clEnqueueReadBuffer(commandQueue, output_buffer, CL_TRUE, 0, sizeof(int)*BUCK*WG_SIZE*N_GROUPS, scanput, 0, NULL, NULL);
+    errNum = clEnqueueReadBuffer(commandQueue, histo_buffer, CL_TRUE, 0, sizeof(int)*BUCK*WG_SIZE*N_GROUPS, scanput, 0, NULL, NULL);
     int* oblockput;
     oblockput = (int*)malloc(sizeof(int)*N_GROUPS);
-    errNum = clEnqueueReadBuffer(commandQueue, block_sum, CL_TRUE, 0, sizeof(int)*N_GROUPS, oblockput, 0, NULL, NULL);
+    errNum = clEnqueueReadBuffer(commandQueue, blocksum_buffer, CL_TRUE, 0, sizeof(int)*N_GROUPS, oblockput, 0, NULL, NULL);
     clFinish(commandQueue);
 /*FIN DEBUG*/
 
@@ -295,7 +312,7 @@ int main() {
     localWorkSize =  N_GROUPS / 2; //TODO:         y necesitamos un unico scan final, por eso el grupo es unico
 
     void* ptr = NULL;
-    errNum = clSetKernelArg(scan, 0, sizeof(cl_mem), &block_sum);      // Input array
+    errNum = clSetKernelArg(scan, 0, sizeof(cl_mem), &blocksum_buffer);      // Input array
     errNum |= clSetKernelArg(scan, 1, sizeof(int)*N_GROUPS, NULL);     // Local Scan TODO: Es N_GROUPS NO ?!
     errNum |= clSetKernelArg(scan, 2, sizeof(cl_mem), ptr);            // Block Sum
 
@@ -308,7 +325,7 @@ int main() {
 /*TODO: DEBUG, BORRAR O PONERLO EN UN IF*/
     int* blockput;
     blockput = (int*)malloc(sizeof(int)*N_GROUPS);
-    errNum = clEnqueueReadBuffer(commandQueue, block_sum, CL_TRUE, 0, sizeof(int)*N_GROUPS, blockput, 0, NULL, NULL);
+    errNum = clEnqueueReadBuffer(commandQueue, blocksum_buffer, CL_TRUE, 0, sizeof(int)*N_GROUPS, blockput, 0, NULL, NULL);
     clFinish(commandQueue);
 /*FIN DEBUG*/
 
@@ -317,8 +334,8 @@ int main() {
     globalWorkSize = (BUCK * N_GROUPS * WG_SIZE) / 2;
     localWorkSize = globalWorkSize / N_GROUPS;
 
-    errNum = clSetKernelArg(coalesce, 0, sizeof(cl_mem), &output_buffer);     // Scan array
-    errNum = clSetKernelArg(coalesce, 1, sizeof(cl_mem), &block_sum);         // Block reductions
+    errNum = clSetKernelArg(coalesce, 0, sizeof(cl_mem), &histo_buffer);     // Scan array
+    errNum = clSetKernelArg(coalesce, 1, sizeof(cl_mem), &blocksum_buffer);         // Block reductions
 
     errNum = clEnqueueNDRangeKernel(commandQueue, coalesce, 1, NULL, &globalWorkSize, &localWorkSize, 0, NULL, NULL);
     if(!errNum == CL_SUCCESS){
@@ -329,7 +346,7 @@ int main() {
 /*TODO: DEBUG, BORRAR O PONERLO EN UN IF*/
     int* coalput;
     coalput = (int*)malloc(sizeof(int)*BUCK*WG_SIZE*N_GROUPS);
-    errNum = clEnqueueReadBuffer(commandQueue, output_buffer, CL_TRUE, 0, sizeof(int)*BUCK*WG_SIZE*N_GROUPS, coalput, 0, NULL, NULL);
+    errNum = clEnqueueReadBuffer(commandQueue, histo_buffer, CL_TRUE, 0, sizeof(int)*BUCK*WG_SIZE*N_GROUPS, coalput, 0, NULL, NULL);
     clFinish(commandQueue);
 /*FIN DEBUG*/
 
@@ -339,8 +356,8 @@ int main() {
     localWorkSize = WG_SIZE;
 
     errNum = clSetKernelArg(reorder, 0, sizeof(cl_mem), &array_buffer);       // Input array /*TODO: Change with pass*/
-    errNum |= clSetKernelArg(reorder, 1, sizeof(cl_mem), &output_buffer);     
-    errNum |= clSetKernelArg(reorder, 2, sizeof(cl_mem), &output_buffer_final);
+    errNum |= clSetKernelArg(reorder, 1, sizeof(cl_mem), &histo_buffer);     
+    errNum |= clSetKernelArg(reorder, 2, sizeof(cl_mem), &output_buffer);
     errNum |= clSetKernelArg(reorder, 3, sizeof(int), &pass);                 // Pass number /*TODO: Change with pass*/
     errNum |= clSetKernelArg(reorder, 4, sizeof(int), &arrlen);               // Number of elements in array /*TODO: Round to power of 2*/
     errNum |= clSetKernelArg(reorder, 5, sizeof(int)*BUCK*WG_SIZE, NULL);     // Local Histogram
@@ -366,9 +383,7 @@ int main() {
     // Enqueue host read (device buffer -> host)
     //-------------------
     
-    int* output;
-    output = (int*)malloc(array_dataSize);
-    errNum = clEnqueueReadBuffer(commandQueue, output_buffer_final, CL_TRUE, 0, array_dataSize, output, 0, NULL, NULL);
+    errNum = clEnqueueReadBuffer(commandQueue, output_buffer, CL_TRUE, 0, array_dataSize, output, 0, NULL, NULL);
     clFinish(commandQueue);
     
     //Verify output with normal function
@@ -431,9 +446,9 @@ int main() {
     clReleaseCommandQueue(commandQueue);
     
     clReleaseMemObject(array_buffer);
+    clReleaseMemObject(histo_buffer);
+    clReleaseMemObject(blocksum_buffer);
     clReleaseMemObject(output_buffer);
-    clReleaseMemObject(block_sum);
-    clReleaseMemObject(output_buffer_final);
 
     clReleaseContext(context);
     //Host

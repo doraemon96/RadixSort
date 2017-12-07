@@ -34,11 +34,11 @@
 
 
 //Number of total bits in the integers to sort
-#define BITS 32
+#define BITS 64
 //Number of buckets necessary
 #define BUCK (1 << RADIX)
 //Number of bits in the radix
-#define RADIX 3
+#define RADIX 1
 
 
 /*Testing functions*/
