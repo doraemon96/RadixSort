@@ -38,31 +38,11 @@
 //Number of buckets necessary
 #define BUCK (1 << RADIX)
 //Number of bits in the radix
-#define RADIX 1
+#define RADIX 3
 
 
 /*Testing functions*/
 //Size of the array to order (if _RS_FILLFUN_ not defined, generateArray will create a random one).
 #define ARRLEN 8
 
-/*#define _RS_FILLFUN_ arraywithones()
-int* arraywithones(void)
-{
-    int i, *array = malloc(sizeof(int) * ARRLEN);
-    for(i=0; i<ARRLEN; i++)
-        array[i] = 1;
-
-    return array;
-}
-*/
-
-#define _RS_FILLFUN_ predefarray()
-int *predefarray(void) //define ARRLEN = 8
-{
-    int i, *array = malloc(sizeof(int) * ARRLEN);
-    int constarr[8] = {120,223,102,300,335,160,253,111};
-    for(i=0; i<ARRLEN; i++)
-        array[i] = constarr[i];
-    return array;
-}
 #endif /*_RADIXSORT_H_*/

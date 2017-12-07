@@ -21,6 +21,18 @@
 //Kernel includes
 #include "radixsort.h"
 
+
+//TODO: Testing function, redo this
+#define _RS_FILLFUN_ predefarray()
+int *predefarray(void) //define ARRLEN = 8
+{
+    int i, *array = malloc(sizeof(int) * ARRLEN);
+    int constarr[8] = {120,223,102,300,335,160,253,111};
+    for(i=0; i<ARRLEN; i++)
+        array[i] = constarr[i];
+    return array;
+}
+
 //Kernel defines
 #ifndef _RS_FILLFUN_
 #define _RS_FILLFUN_ generateArray()
@@ -46,6 +58,9 @@ int filesize(FILE *fp) {
 
 
 int main() {
+
+    //Disable caching for nvidia, helps with .h files included in kernel
+    setenv("CUDA_CACHE_DISABLE", "1", 1);
 
     //----------------------
     // Initialize host data
@@ -168,7 +183,7 @@ int main() {
     }
 
     //Compile for openCL 1.1
-    errNum = clBuildProgram(program, 1, devices, "-cl-std=CL1.1", NULL, NULL);
+    errNum = clBuildProgram(program, 1, devices, "-I. -cl-std=CL1.1", NULL, NULL);
     if(!errNum == CL_SUCCESS){
         printf("Error building program. Using \"clBuildProgram\"\n");
         if(errNum == CL_BUILD_PROGRAM_FAILURE){
