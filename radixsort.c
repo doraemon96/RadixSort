@@ -148,16 +148,19 @@ int main() {
     //----------------
     cl_mem array_buffer;
     cl_mem histo_buffer;
+    cl_mem scan_buffer;
     cl_mem blocksum_buffer;
     cl_mem output_buffer;
 
     //Create input buff
     array_buffer = clCreateBuffer(context, CL_MEM_READ_WRITE, array_dataSize, NULL, &errNum);
-    //Create output buff
+    //Create histo buff
     histo_buffer = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(int) * BUCK * N_GROUPS * WG_SIZE, NULL, &errNum);
-    //Create block sum buff
+    //Create scan buff
+    scan_buffer = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(int) * BUCK * N_GROUPS * WG_SIZE, NULL, &errNum);
+    //Create blocksum buff
     blocksum_buffer = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(int) * N_GROUPS, NULL, &errNum);
-    //Create final output buff
+    //Create output buff
     output_buffer = clCreateBuffer(context, CL_MEM_READ_WRITE, array_dataSize, NULL, &errNum);
 
 
@@ -231,6 +234,36 @@ int main() {
         exit(1);
     }
 
+    //-------------------------------
+    // Set kernels constant arguments
+    //-------------------------------
+    int arrlen = ARRLEN;
+
+    //Count fixed args
+    errNum = clSetKernelArg(count, 2, sizeof(int)*BUCK*WG_SIZE, NULL);  // Local Histogram
+    errNum |= clSetKernelArg(count, 4, sizeof(int), &arrlen);           // Number of elements in array /*TODO: Round to power of 2*/
+
+    //Scan fixed args
+    errNum = clSetKernelArg(scan, 1, sizeof(cl_mem), &scan_buffer);       // Output array
+    errNum |= clSetKernelArg(scan, 2, sizeof(int)*BUCK*WG_SIZE, NULL);    // Local Scan
+    errNum |= clSetKernelArg(scan, 3, sizeof(cl_mem), &blocksum_buffer);  // Block Sum
+
+    //Blocksum fixed args
+    void* ptr = NULL;
+    errNum = clSetKernelArg(blocksum, 0, sizeof(cl_mem), &blocksum_buffer);   // Input array
+    errNum |= clSetKernelArg(blocksum, 1, sizeof(cl_mem), &blocksum_buffer);  // Output array
+    errNum |= clSetKernelArg(blocksum, 2, sizeof(int)*N_GROUPS, NULL);        // Local Scan
+    errNum |= clSetKernelArg(blocksum, 3, sizeof(cl_mem), ptr);               // Block Sum (null)
+
+    //Coalesce fixed args
+    errNum = clSetKernelArg(coalesce, 0, sizeof(cl_mem), &scan_buffer);      // Scan array
+    errNum |= clSetKernelArg(coalesce, 1, sizeof(cl_mem), &blocksum_buffer);  // Block reductions
+
+    //Reorder fixed args
+    errNum = clSetKernelArg(reorder, 1, sizeof(cl_mem), &scan_buffer);    //Prefix Sum array
+    errNum |= clSetKernelArg(reorder, 4, sizeof(int), &arrlen);            // Number of elements in array /*TODO: Round to power of 2*/
+    errNum |= clSetKernelArg(reorder, 5, sizeof(int)*BUCK*WG_SIZE, NULL);  // Local Histogram
+
 
     //-------------------------------
     // Enqueue kernels for execution
@@ -238,137 +271,129 @@ int main() {
 
     size_t globalWorkSize;
     size_t localWorkSize;
-    int pass = 0;
-    int arrlen = ARRLEN;
 
-    //Count arguments
-    globalWorkSize = N_GROUPS * WG_SIZE;
-    localWorkSize = WG_SIZE;
+    int pass;
+    for(pass = 0; pass < BITS/RADIX; pass++){
+        printf("Currently on pass:[%d]\n",pass);
 
-    errNum = clSetKernelArg(count, 0, sizeof(cl_mem), &array_buffer);       // Input array /*TODO: Change with pass*/
-    errNum |= clSetKernelArg(count, 1, sizeof(cl_mem), &histo_buffer);     // Output array
-    errNum |= clSetKernelArg(count, 2, sizeof(int)*BUCK*WG_SIZE, NULL);     // Local Histogram
-    errNum |= clSetKernelArg(count, 3, sizeof(int), &pass);                 // Pass number /*TODO: Change with pass*/
-    errNum |= clSetKernelArg(count, 4, sizeof(int), &arrlen);               // Number of elements in array /*TODO: Round to power of 2*/
-    
-    errNum = clEnqueueNDRangeKernel(commandQueue, count, 1, NULL, &globalWorkSize, &localWorkSize, 0, NULL, NULL);
-    if(!errNum == CL_SUCCESS){
-        printf("Count kernel terminated abruptly\n");
-        exit(1);
-    }
-    clFinish(commandQueue);
-/*TODO: DEBUG, BORRAR O PONERLO EN UN IF*/
-    int* countput;
-    countput = (int*)malloc(sizeof(int)*BUCK*WG_SIZE*N_GROUPS);
-    errNum = clEnqueueReadBuffer(commandQueue, histo_buffer, CL_TRUE, 0, sizeof(int)*BUCK*WG_SIZE*N_GROUPS, countput, 0, NULL, NULL);
-    clFinish(commandQueue);
-/*FIN DEBUG*/
-
-
-    //Scan arguments
-    globalWorkSize = (BUCK * N_GROUPS * WG_SIZE) / 2;
-    localWorkSize = globalWorkSize / N_GROUPS;
-
-    errNum = clSetKernelArg(scan, 0, sizeof(cl_mem), &histo_buffer);      // Input array
-    errNum |= clSetKernelArg(scan, 1, sizeof(int)*BUCK*WG_SIZE, NULL);     // Local Scan
-    errNum |= clSetKernelArg(scan, 2, sizeof(cl_mem), &blocksum_buffer);         // Block Sum
-
-    errNum = clEnqueueNDRangeKernel(commandQueue, scan, 1, NULL, &globalWorkSize, &localWorkSize, 0, NULL, NULL);
-    if(!errNum == CL_SUCCESS){
-        printf("Scan kernel terminated abruptly\n");
-        switch(errNum) {
-            case CL_INVALID_KERNEL_ARGS:
-                printf("Invalid kernel args\n");
-                break;
-            default:
-                printf("Unspecified case\n");
+        //Count arguments
+        globalWorkSize = N_GROUPS * WG_SIZE;
+        localWorkSize = WG_SIZE;
+        errNum = clSetKernelArg(count, 0, sizeof(cl_mem), &array_buffer);   // Input array /*TODO: Change with pass*/
+        errNum |= clSetKernelArg(count, 1, sizeof(cl_mem), &histo_buffer);  // Output array
+        errNum |= clSetKernelArg(count, 3, sizeof(int), &pass);             // Pass number /*TODO: Change with pass*/
+        errNum = clEnqueueNDRangeKernel(commandQueue, count, 1, NULL, &globalWorkSize, &localWorkSize, 0, NULL, NULL);
+        if(!errNum == CL_SUCCESS){
+            printf("Count kernel terminated abruptly\n");
+            exit(1);
         }
-            
-        exit(1);
-    }
-    clFinish(commandQueue);
-/*TODO: DEBUG, BORRAR O PONERLO EN UN IF*/
-    int* scanput;
-    scanput = (int*)malloc(sizeof(int)*BUCK*WG_SIZE*N_GROUPS);
-    errNum = clEnqueueReadBuffer(commandQueue, histo_buffer, CL_TRUE, 0, sizeof(int)*BUCK*WG_SIZE*N_GROUPS, scanput, 0, NULL, NULL);
-    int* oblockput;
-    oblockput = (int*)malloc(sizeof(int)*N_GROUPS);
-    errNum = clEnqueueReadBuffer(commandQueue, blocksum_buffer, CL_TRUE, 0, sizeof(int)*N_GROUPS, oblockput, 0, NULL, NULL);
-    clFinish(commandQueue);
-/*FIN DEBUG*/
+        clFinish(commandQueue);
+    #ifdef DEBUG
+        int* countput;
+        countput = (int*)malloc(sizeof(int)*BUCK*WG_SIZE*N_GROUPS);
+        errNum = clEnqueueReadBuffer(commandQueue, histo_buffer, CL_TRUE, 0, sizeof(int)*BUCK*WG_SIZE*N_GROUPS, countput, 0, NULL, NULL);
+        clFinish(commandQueue);
+    #endif
 
 
-    //Block Sum arguments
-    globalWorkSize = N_GROUPS / 2; //TODO: Para gian: porque en el scan haciamos una suma cada 2
-    localWorkSize =  N_GROUPS / 2; //TODO:         y necesitamos un unico scan final, por eso el grupo es unico
-
-    void* ptr = NULL;
-    errNum = clSetKernelArg(blocksum, 0, sizeof(cl_mem), &blocksum_buffer);      // Input array
-    errNum |= clSetKernelArg(blocksum, 1, sizeof(int)*N_GROUPS, NULL);     // Local Scan TODO: Es N_GROUPS NO ?!
-    errNum |= clSetKernelArg(blocksum, 2, sizeof(cl_mem), ptr);            // Block Sum
-
-    errNum = clEnqueueNDRangeKernel(commandQueue, blocksum, 1, NULL, &globalWorkSize, &localWorkSize, 0, NULL, NULL);
-    if(!errNum == CL_SUCCESS){
-        printf("Block Sum kernel terminated abruptly\n");
-        exit(1);
-    }
-    clFinish(commandQueue);
-/*TODO: DEBUG, BORRAR O PONERLO EN UN IF*/
-    int* blockput;
-    blockput = (int*)malloc(sizeof(int)*N_GROUPS);
-    errNum = clEnqueueReadBuffer(commandQueue, blocksum_buffer, CL_TRUE, 0, sizeof(int)*N_GROUPS, blockput, 0, NULL, NULL);
-    clFinish(commandQueue);
-/*FIN DEBUG*/
-
-
-    //Coalesce arguments
-    globalWorkSize = (BUCK * N_GROUPS * WG_SIZE) / 2;
-    localWorkSize = globalWorkSize / N_GROUPS;
-
-    errNum = clSetKernelArg(coalesce, 0, sizeof(cl_mem), &histo_buffer);     // Scan array
-    errNum = clSetKernelArg(coalesce, 1, sizeof(cl_mem), &blocksum_buffer);         // Block reductions
-
-    errNum = clEnqueueNDRangeKernel(commandQueue, coalesce, 1, NULL, &globalWorkSize, &localWorkSize, 0, NULL, NULL);
-    if(!errNum == CL_SUCCESS){
-        printf("Coalesce kernel terminated abruptly\n");
-        exit(1);
-    }
-    clFinish(commandQueue);
-/*TODO: DEBUG, BORRAR O PONERLO EN UN IF*/
-    int* coalput;
-    coalput = (int*)malloc(sizeof(int)*BUCK*WG_SIZE*N_GROUPS);
-    errNum = clEnqueueReadBuffer(commandQueue, histo_buffer, CL_TRUE, 0, sizeof(int)*BUCK*WG_SIZE*N_GROUPS, coalput, 0, NULL, NULL);
-    clFinish(commandQueue);
-/*FIN DEBUG*/
-
-
-    //Reorder arguments
-    globalWorkSize = N_GROUPS * WG_SIZE;
-    localWorkSize = WG_SIZE;
-
-    errNum = clSetKernelArg(reorder, 0, sizeof(cl_mem), &array_buffer);       // Input array /*TODO: Change with pass*/
-    errNum |= clSetKernelArg(reorder, 1, sizeof(cl_mem), &histo_buffer);     
-    errNum |= clSetKernelArg(reorder, 2, sizeof(cl_mem), &output_buffer);
-    errNum |= clSetKernelArg(reorder, 3, sizeof(int), &pass);                 // Pass number /*TODO: Change with pass*/
-    errNum |= clSetKernelArg(reorder, 4, sizeof(int), &arrlen);               // Number of elements in array /*TODO: Round to power of 2*/
-    errNum |= clSetKernelArg(reorder, 5, sizeof(int)*BUCK*WG_SIZE, NULL);     // Local Histogram
-    
-    errNum = clEnqueueNDRangeKernel(commandQueue, reorder, 1, NULL, &globalWorkSize, &localWorkSize, 0, NULL, NULL);
-    if(!errNum == CL_SUCCESS){
-        printf("Reorder kernel terminated abruptly\n");
-        switch(errNum) {
-            case CL_INVALID_KERNEL_ARGS:
-                printf("Invalid kernel args\n");
-                break;
-            default:
-                printf("Unspecified case\n");
+        //Scan arguments
+        globalWorkSize = (BUCK * N_GROUPS * WG_SIZE) / 2;
+        localWorkSize = globalWorkSize / N_GROUPS;
+        errNum = clSetKernelArg(scan, 0, sizeof(cl_mem), &histo_buffer);      // Input array
+        errNum = clEnqueueNDRangeKernel(commandQueue, scan, 1, NULL, &globalWorkSize, &localWorkSize, 0, NULL, NULL);
+        if(!errNum == CL_SUCCESS){
+            printf("Scan kernel terminated abruptly\n");
+            switch(errNum) {
+                case CL_INVALID_KERNEL_ARGS:
+                    printf("Invalid kernel args\n");
+                    break;
+                default:
+                    printf("Unspecified case\n");
+            }
+                
+            exit(1);
         }
-            
-        exit(1);
+        clFinish(commandQueue);
+    #ifdef DEBUG
+        int* scanput;
+        scanput = (int*)malloc(sizeof(int)*BUCK*WG_SIZE*N_GROUPS);
+        errNum = clEnqueueReadBuffer(commandQueue, histo_buffer, CL_TRUE, 0, sizeof(int)*BUCK*WG_SIZE*N_GROUPS, scanput, 0, NULL, NULL);
+        int* oblockput;
+        oblockput = (int*)malloc(sizeof(int)*N_GROUPS);
+        errNum = clEnqueueReadBuffer(commandQueue, blocksum_buffer, CL_TRUE, 0, sizeof(int)*N_GROUPS, oblockput, 0, NULL, NULL);
+        clFinish(commandQueue);
+    #endif
+
+
+        //Block Sum arguments
+        globalWorkSize = N_GROUPS / 2;
+        localWorkSize =  N_GROUPS / 2;
+        errNum = clEnqueueNDRangeKernel(commandQueue, blocksum, 1, NULL, &globalWorkSize, &localWorkSize, 0, NULL, NULL);
+        if(!errNum == CL_SUCCESS){
+            printf("Block Sum kernel terminated abruptly\n");
+            switch(errNum){
+                case CL_INVALID_KERNEL_ARGS:
+                    printf("Invalid kernel args\n");
+                    break;
+                default:
+                    printf("Unspecified case\n");
+            }
+            exit(1);
+        }
+        clFinish(commandQueue);
+    #ifdef DEBUG
+        int* blockput;
+        blockput = (int*)malloc(sizeof(int)*N_GROUPS);
+        errNum = clEnqueueReadBuffer(commandQueue, blocksum_buffer, CL_TRUE, 0, sizeof(int)*N_GROUPS, blockput, 0, NULL, NULL);
+        clFinish(commandQueue);
+    #endif
+
+
+        //Coalesce arguments
+        globalWorkSize = (BUCK * N_GROUPS * WG_SIZE) / 2;
+        localWorkSize = globalWorkSize / N_GROUPS;
+        errNum = clEnqueueNDRangeKernel(commandQueue, coalesce, 1, NULL, &globalWorkSize, &localWorkSize, 0, NULL, NULL);
+        if(!errNum == CL_SUCCESS){
+            printf("Coalesce kernel terminated abruptly\n");
+            exit(1);
+        }
+        clFinish(commandQueue);
+    #ifdef DEBUG
+        int* coalput;
+        coalput = (int*)malloc(sizeof(int)*BUCK*WG_SIZE*N_GROUPS);
+        errNum = clEnqueueReadBuffer(commandQueue, scan_buffer, CL_TRUE, 0, sizeof(int)*BUCK*WG_SIZE*N_GROUPS, coalput, 0, NULL, NULL);
+        clFinish(commandQueue);
+    #endif
+
+
+        //Reorder arguments
+        globalWorkSize = N_GROUPS * WG_SIZE;
+        localWorkSize = WG_SIZE;
+        errNum = clSetKernelArg(reorder, 0, sizeof(cl_mem), &array_buffer);       // Input array /*TODO: Change with pass*/
+        errNum |= clSetKernelArg(reorder, 2, sizeof(cl_mem), &output_buffer);
+        errNum |= clSetKernelArg(reorder, 3, sizeof(int), &pass);                 // Pass number /*TODO: Change with pass*/
+        errNum = clEnqueueNDRangeKernel(commandQueue, reorder, 1, NULL, &globalWorkSize, &localWorkSize, 0, NULL, NULL);
+        if(!errNum == CL_SUCCESS){
+            printf("Reorder kernel terminated abruptly\n");
+            switch(errNum) {
+                case CL_INVALID_KERNEL_ARGS:
+                    printf("Invalid kernel args\n");
+                    break;
+                default:
+                    printf("Unspecified case\n");
+            }
+                
+            exit(1);
+        }
+        clFinish(commandQueue);
+
+
+        //Swap current array with newest array
+        cl_mem tmp = array_buffer;
+        array_buffer = output_buffer;
+        output_buffer = tmp;
+
     }
-    clFinish(commandQueue);
-
-
 
     //-------------------
     // Enqueue host read (device buffer -> host)
@@ -390,6 +415,7 @@ int main() {
         printf("[%d]", array[k]);
     }
     printf("\n\n");
+#ifdef DEBUG
     printf("Resultado Count:");
     for(k=0; k<BUCK*WG_SIZE*N_GROUPS; k++) {
         printf("[%d]", countput[k]);
@@ -415,6 +441,7 @@ int main() {
         printf("[%d]", coalput[k]);
     }
     printf("\n\n");
+#endif
     printf("Resultado Ordenado:");
     for(k=0; k<ARRLEN; k++) {
         printf("[%d]", output[k]);
@@ -439,6 +466,7 @@ int main() {
     
     clReleaseMemObject(array_buffer);
     clReleaseMemObject(histo_buffer);
+    clReleaseMemObject(scan_buffer);
     clReleaseMemObject(blocksum_buffer);
     clReleaseMemObject(output_buffer);
 
@@ -446,12 +474,13 @@ int main() {
     //Host
     free(array);
     free(output);
+#ifdef DEBUG
     free(countput);
     free(scanput);
     free(coalput);
     free(oblockput);
     free(blockput);   
-
+#endif
     free(platforms);
     free(devices);
     

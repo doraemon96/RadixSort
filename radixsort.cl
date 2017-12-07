@@ -64,6 +64,7 @@ __kernel void count(const __global int* input,
 
 /** SCAN KERNEL **/
 __kernel void scan(__global int* input,
+                   __global int* output,
                    __local int* local_scan,
                    __global int* block_sum)
 {
@@ -115,8 +116,8 @@ __kernel void scan(__global int* input,
     barrier(CLK_LOCAL_MEM_FENCE);
 
     //Write results from Local to Global memory
-    input[2 * g_id]     = local_scan[2 * l_id];
-    input[2 * g_id + 1] = local_scan[2 * l_id + 1];
+    output[2 * g_id]     = local_scan[2 * l_id];
+    output[2 * g_id + 1] = local_scan[2 * l_id + 1];
 }
 
 
