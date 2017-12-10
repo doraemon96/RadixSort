@@ -20,9 +20,6 @@
 //Max source size for the kernels file (radixsort.cl)
 #define MAX_SOURCE_SIZE 0x100000
 
-//Number of kernels in the kernels file (radixsort.cl)
-#define KERNELS_NUMBER 3
-
 //Maximum length of a kernel in the kernels file (radixsort.cl)
 #define MAX_KERNEL_NAME 20
 
@@ -38,7 +35,7 @@
 //Number of buckets necessary
 #define BUCK (1 << RADIX)
 //Number of bits in the radix
-#define RADIX 1
+#define RADIX 2
 
 
 /*Testing functions*/
