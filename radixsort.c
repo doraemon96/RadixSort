@@ -20,7 +20,49 @@
 
 //Kernel includes
 #include "radixsort.h"
+#include "checkorder.c"
 
+int *radixsort(int *array, int size);
+
+int main(void)
+{
+
+    int i, *array = malloc(sizeof(int) * ARRLEN);
+    #ifdef DEBUG
+    int constarr[8] = {120,223,102,300,335,160,253,111};
+    for(i=0; i<ARRLEN; i++)
+        array[i] = constarr[i];
+    #else
+    /*Define an array filling function for testing (random)*/
+    for(i=0; i<ARRLEN; i++){
+    array[i] = rand() % 10000;
+    }   
+    #endif
+
+    /*Call radixsort*/
+    int *sorted;
+    sorted = radixsort(array, ARRLEN);
+    
+    printf("Arreglo Original:\n");
+    for(i=0; i<ARRLEN; i++) {
+        printf("[%d]", array[i]);
+    }
+    printf("\n\n");  
+    printf("Arreglo Ordenado:\n");
+    for(i=0; i<ARRLEN; i++) {
+        printf("[%d]", sorted[i]);
+    }
+    printf("\n\n");
+
+    /*Check if sorted*/
+    checkorder(sorted,ARRLEN);
+    
+    free(array);
+    free(sorted);
+
+    return 0;
+
+}
 
 //TODO: Testing function, redo this
 #define _RS_FILLFUN_ predefarray()
@@ -57,7 +99,13 @@ int filesize(FILE *fp) {
 }
 
 
-int main() {
+//**********************************************
+// radixsort
+//
+//   Takes an int array pointer an its size and
+//   returns a sorted array
+//**********************************************
+int *radixsort(int *array, int size) {
 
     //Disable caching for nvidia, helps with .h files included in kernel
     setenv("CUDA_CACHE_DISABLE", "1", 1);
@@ -65,18 +113,13 @@ int main() {
     //----------------------
     // Initialize host data
     //----------------------
-    int *array = NULL; //Input array
     int *output = NULL; //Output array
     
     //Data array size
-    size_t array_dataSize = sizeof(int)*ARRLEN;
+    size_t array_dataSize = sizeof(int)*size;
 
     //Allocate space for the arrays
-    array = (int*)malloc(array_dataSize);
     output = (int*)malloc(array_dataSize);
-
-    //Initialize array data
-    array = _RS_FILLFUN_;
 
     cl_int errNum;
 
@@ -402,20 +445,14 @@ int main() {
     errNum = clEnqueueReadBuffer(commandQueue, output_buffer, CL_TRUE, 0, array_dataSize, output, 0, NULL, NULL);
     clFinish(commandQueue);
     
-    //Verify output with normal function
-    //bool result = true;
-    //TODO: VERIFICADOR DE ORDEN
-
-
-    //******************+TESTING+**********************
     
+#ifdef DEBUG
     int k;
     printf("Arreglo Original:\n");
     for(k=0; k<ARRLEN; k++) {
         printf("[%d]", array[k]);
     }
     printf("\n\n");
-#ifdef DEBUG
     printf("Resultado Count:");
     for(k=0; k<BUCK*WG_SIZE*N_GROUPS; k++) {
         printf("[%d]", countput[k]);
@@ -441,15 +478,12 @@ int main() {
         printf("[%d]", coalput[k]);
     }
     printf("\n\n");
-#endif
     printf("Resultado Ordenado:");
     for(k=0; k<ARRLEN; k++) {
         printf("[%d]", output[k]);
     }
     printf("\n\n");
-
-
-    //******************-TESTING-**********************
+#endif
 
     //----------------
     // Free resources
@@ -472,8 +506,6 @@ int main() {
 
     clReleaseContext(context);
     //Host
-    free(array);
-    free(output);
 #ifdef DEBUG
     free(countput);
     free(scanput);
@@ -484,5 +516,8 @@ int main() {
     free(platforms);
     free(devices);
     
-    return 0;
+    //---------------------
+    // Return sorted array
+    //---------------------
+    return output;
 }
