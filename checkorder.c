@@ -184,7 +184,7 @@ void checkorder(int *array, int size) {
     errNum |= clSetKernelArg(parallelcmp, 1, sizeof(cl_mem), &compare_buffer);
     errNum |= clSetKernelArg(parallelcmp, 2, sizeof(int), &arrlen);
 
-    size_t globalWorkSizeReduce = (BUCK * N_GROUPS * WG_SIZE) / 2;
+    size_t globalWorkSizeReduce = (N_GROUPS * WG_SIZE) / 2;
     size_t localWorkSizeReduce = globalWorkSizeReduce / N_GROUPS;
     errNum = clSetKernelArg(reduce, 0, sizeof(cl_mem), &compare_buffer);
     errNum |= clSetKernelArg(reduce, 1, sizeof(cl_mem), &reduce_return);

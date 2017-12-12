@@ -15,6 +15,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <time.h>
+#include <inttypes.h>
+
 //OpenCL includes
 #include <CL/opencl.h>
 
@@ -23,6 +26,12 @@
 #include "checkorder.c"
 
 int *radixsort(int *array, int size);
+
+int cmpfunc (const void * a, const void * b)
+{
+    return ( *(int*)a < *(int*)b );
+}
+
 
 int main(void)
 {
@@ -35,14 +44,27 @@ int main(void)
     #else
     /*Define an array filling function for testing (random)*/
     for(i=0; i<ARRLEN; i++){
-    array[i] = rand() % 10000;
+    array[i] = rand() % ARRLEN;
     }   
     #endif
 
-    /*Call radixsort*/
     int *sorted;
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC_RAW, &start);
+    /*Call radixsort*/
     sorted = radixsort(array, ARRLEN);
-    
+    clock_gettime(CLOCK_MONOTONIC_RAW, &end);
+    uint64_t delta = (end.tv_sec - start.tv_sec) * 1000000 + (end.tv_nsec - start.tv_nsec) / 1000;
+    printf("Radixsort of %d numbers took %" PRIu64 " microseconds\n", ARRLEN, delta);
+
+    clock_gettime(CLOCK_MONOTONIC_RAW, &start);
+    /*Call quicksort*/
+    qsort(array, ARRLEN, sizeof(int), cmpfunc);
+    clock_gettime(CLOCK_MONOTONIC_RAW, &end);
+    delta = (end.tv_sec - start.tv_sec) * 1000000 + (end.tv_nsec - start.tv_nsec) / 1000;
+    printf("Quicksort of %d numbers took %" PRIu64 " microseconds\n", ARRLEN, delta);
+
+#ifdef PRINT
     printf("Arreglo Original:\n");
     for(i=0; i<ARRLEN; i++) {
         printf("[%d]", array[i]);
@@ -53,6 +75,7 @@ int main(void)
         printf("[%d]", sorted[i]);
     }
     printf("\n\n");
+#endif
 
     /*Check if sorted*/
     checkorder(sorted,ARRLEN);
@@ -283,15 +306,21 @@ int *radixsort(int *array, int size) {
     int arrlen = ARRLEN;
 
     //Count fixed args
+    size_t CountGlobalWorkSize = N_GROUPS * WG_SIZE;
+    size_t CountLocalWorkSize = WG_SIZE;
     errNum = clSetKernelArg(count, 2, sizeof(int)*BUCK*WG_SIZE, NULL);  // Local Histogram
     errNum |= clSetKernelArg(count, 4, sizeof(int), &arrlen);           // Number of elements in array /*TODO: Round to power of 2*/
 
     //Scan fixed args
+    size_t ScanGlobalWorkSize = (BUCK * N_GROUPS * WG_SIZE) / 2;
+    size_t ScanLocalWorkSize = ScanGlobalWorkSize / N_GROUPS;
     errNum = clSetKernelArg(scan, 1, sizeof(cl_mem), &scan_buffer);       // Output array
     errNum |= clSetKernelArg(scan, 2, sizeof(int)*BUCK*WG_SIZE, NULL);    // Local Scan
     errNum |= clSetKernelArg(scan, 3, sizeof(cl_mem), &blocksum_buffer);  // Block Sum
 
     //Blocksum fixed args
+    size_t BlocksumGlobalWorkSize = N_GROUPS / 2;
+    size_t BlocksumLocalWorkSize =  N_GROUPS / 2;
     void* ptr = NULL;
     errNum = clSetKernelArg(blocksum, 0, sizeof(cl_mem), &blocksum_buffer);   // Input array
     errNum |= clSetKernelArg(blocksum, 1, sizeof(cl_mem), &blocksum_buffer);  // Output array
@@ -299,10 +328,14 @@ int *radixsort(int *array, int size) {
     errNum |= clSetKernelArg(blocksum, 3, sizeof(cl_mem), ptr);               // Block Sum (null)
 
     //Coalesce fixed args
+    size_t CoalesceGlobalWorkSize = (BUCK * N_GROUPS * WG_SIZE) / 2;
+    size_t CoalesceLocalWorkSize = CoalesceGlobalWorkSize / N_GROUPS;
     errNum = clSetKernelArg(coalesce, 0, sizeof(cl_mem), &scan_buffer);      // Scan array
     errNum |= clSetKernelArg(coalesce, 1, sizeof(cl_mem), &blocksum_buffer);  // Block reductions
 
     //Reorder fixed args
+    size_t ReorderGlobalWorkSize = N_GROUPS * WG_SIZE;
+    size_t ReorderLocalWorkSize = WG_SIZE;
     errNum = clSetKernelArg(reorder, 1, sizeof(cl_mem), &scan_buffer);    //Prefix Sum array
     errNum |= clSetKernelArg(reorder, 4, sizeof(int), &arrlen);            // Number of elements in array /*TODO: Round to power of 2*/
     errNum |= clSetKernelArg(reorder, 5, sizeof(int)*BUCK*WG_SIZE, NULL);  // Local Histogram
@@ -312,20 +345,21 @@ int *radixsort(int *array, int size) {
     // Enqueue kernels for execution
     //-------------------------------
 
-    size_t globalWorkSize;
-    size_t localWorkSize;
-
     int pass;
+#ifdef DEBUG //Do only DEBUG passes
+    for(pass = 0; pass < DEBUG; pass++){
+#else        //Operate normaly
     for(pass = 0; pass < BITS/RADIX; pass++){
+#endif
+#ifdef PRINT
         printf("Currently on pass:[%d]\n",pass);
+#endif
 
         //Count arguments
-        globalWorkSize = N_GROUPS * WG_SIZE;
-        localWorkSize = WG_SIZE;
         errNum = clSetKernelArg(count, 0, sizeof(cl_mem), &array_buffer);   // Input array /*TODO: Change with pass*/
         errNum |= clSetKernelArg(count, 1, sizeof(cl_mem), &histo_buffer);  // Output array
         errNum |= clSetKernelArg(count, 3, sizeof(int), &pass);             // Pass number /*TODO: Change with pass*/
-        errNum = clEnqueueNDRangeKernel(commandQueue, count, 1, NULL, &globalWorkSize, &localWorkSize, 0, NULL, NULL);
+        errNum = clEnqueueNDRangeKernel(commandQueue, count, 1, NULL, &CountGlobalWorkSize, &CountLocalWorkSize, 0, NULL, NULL);
         if(!errNum == CL_SUCCESS){
             printf("Count kernel terminated abruptly\n");
             exit(1);
@@ -340,10 +374,8 @@ int *radixsort(int *array, int size) {
 
 
         //Scan arguments
-        globalWorkSize = (BUCK * N_GROUPS * WG_SIZE) / 2;
-        localWorkSize = globalWorkSize / N_GROUPS;
         errNum = clSetKernelArg(scan, 0, sizeof(cl_mem), &histo_buffer);      // Input array
-        errNum = clEnqueueNDRangeKernel(commandQueue, scan, 1, NULL, &globalWorkSize, &localWorkSize, 0, NULL, NULL);
+        errNum = clEnqueueNDRangeKernel(commandQueue, scan, 1, NULL, &ScanGlobalWorkSize, &ScanLocalWorkSize, 0, NULL, NULL);
         if(!errNum == CL_SUCCESS){
             printf("Scan kernel terminated abruptly\n");
             switch(errNum) {
@@ -369,9 +401,7 @@ int *radixsort(int *array, int size) {
 
 
         //Block Sum arguments
-        globalWorkSize = N_GROUPS / 2;
-        localWorkSize =  N_GROUPS / 2;
-        errNum = clEnqueueNDRangeKernel(commandQueue, blocksum, 1, NULL, &globalWorkSize, &localWorkSize, 0, NULL, NULL);
+        errNum = clEnqueueNDRangeKernel(commandQueue, blocksum, 1, NULL, &BlocksumGlobalWorkSize, &BlocksumLocalWorkSize, 0, NULL, NULL);
         if(!errNum == CL_SUCCESS){
             printf("Block Sum kernel terminated abruptly\n");
             switch(errNum){
@@ -393,9 +423,7 @@ int *radixsort(int *array, int size) {
 
 
         //Coalesce arguments
-        globalWorkSize = (BUCK * N_GROUPS * WG_SIZE) / 2;
-        localWorkSize = globalWorkSize / N_GROUPS;
-        errNum = clEnqueueNDRangeKernel(commandQueue, coalesce, 1, NULL, &globalWorkSize, &localWorkSize, 0, NULL, NULL);
+        errNum = clEnqueueNDRangeKernel(commandQueue, coalesce, 1, NULL, &CoalesceGlobalWorkSize, &CoalesceLocalWorkSize, 0, NULL, NULL);
         if(!errNum == CL_SUCCESS){
             printf("Coalesce kernel terminated abruptly\n");
             exit(1);
@@ -410,12 +438,10 @@ int *radixsort(int *array, int size) {
 
 
         //Reorder arguments
-        globalWorkSize = N_GROUPS * WG_SIZE;
-        localWorkSize = WG_SIZE;
         errNum = clSetKernelArg(reorder, 0, sizeof(cl_mem), &array_buffer);       // Input array /*TODO: Change with pass*/
         errNum |= clSetKernelArg(reorder, 2, sizeof(cl_mem), &output_buffer);
         errNum |= clSetKernelArg(reorder, 3, sizeof(int), &pass);                 // Pass number /*TODO: Change with pass*/
-        errNum = clEnqueueNDRangeKernel(commandQueue, reorder, 1, NULL, &globalWorkSize, &localWorkSize, 0, NULL, NULL);
+        errNum = clEnqueueNDRangeKernel(commandQueue, reorder, 1, NULL, &ReorderGlobalWorkSize, &ReorderLocalWorkSize, 0, NULL, NULL);
         if(!errNum == CL_SUCCESS){
             printf("Reorder kernel terminated abruptly\n");
             switch(errNum) {
