@@ -26,10 +26,14 @@
 #include "checkorder.c"
 
 int *radixsort(int *array, int size);
-
 int cmpfunc (const void * a, const void * b)
 {
     return ( *(int*)a < *(int*)b );
+}
+
+int isPowerOfTwo(int x)
+{
+    return ((x != 0) && ((x & (x - 1)) == 0)) ? 1 : 0;
 }
 
 
@@ -51,18 +55,20 @@ int main(void)
     int *sorted;
     struct timespec start, end;
     clock_gettime(CLOCK_MONOTONIC_RAW, &start);
-    /*Call radixsort*/
+    //Call radixsort
     sorted = radixsort(array, ARRLEN);
     clock_gettime(CLOCK_MONOTONIC_RAW, &end);
     uint64_t delta = (end.tv_sec - start.tv_sec) * 1000000 + (end.tv_nsec - start.tv_nsec) / 1000;
     printf("Radixsort of %d numbers took %" PRIu64 " microseconds\n", ARRLEN, delta);
 
+/*
     clock_gettime(CLOCK_MONOTONIC_RAW, &start);
-    /*Call quicksort*/
+    //Call quicksort
     qsort(array, ARRLEN, sizeof(int), cmpfunc);
     clock_gettime(CLOCK_MONOTONIC_RAW, &end);
     delta = (end.tv_sec - start.tv_sec) * 1000000 + (end.tv_nsec - start.tv_nsec) / 1000;
     printf("Quicksort of %d numbers took %" PRIu64 " microseconds\n", ARRLEN, delta);
+*/
 
 #ifdef PRINT
     printf("Arreglo Original:\n");
@@ -80,37 +86,10 @@ int main(void)
     /*Check if sorted*/
     checkorder(sorted,ARRLEN);
     
-    free(array);
-    free(sorted);
-
     return 0;
 
 }
 
-//TODO: Testing function, redo this
-#define _RS_FILLFUN_ predefarray()
-int *predefarray(void) //define ARRLEN = 8
-{
-    int i, *array = malloc(sizeof(int) * ARRLEN);
-    int constarr[8] = {120,223,102,300,335,160,253,111};
-    for(i=0; i<ARRLEN; i++)
-        array[i] = constarr[i];
-    return array;
-}
-
-//Kernel defines
-#ifndef _RS_FILLFUN_
-#define _RS_FILLFUN_ generateArray()
-/*Define an array filling function for testing (random)*/
-int *generateArray(void)
-{
-    int i, *array = (int*)malloc(sizeof(int) * ARRLEN);
-    for(i=0; i<ARRLEN; i++){
-        array[i] = rand() % 10000;
-    }   
-    return array;
-}
-#endif
 
 //Function to determine a file size (from the current cursor pos.)
 int filesize(FILE *fp) {
@@ -137,8 +116,22 @@ int *radixsort(int *array, int size) {
     // Initialize host data
     //----------------------
     int *output = NULL; //Output array
-    
-    //Data array size
+
+    //Optimize data array size 
+    int diff = 0;
+    if (!isPowerOfTwo(size)) {
+        printf("Optimizando arreglo\n");
+        int pown = 1;
+        while(pown < size)
+            pown <<= 1;
+        diff = size - pown;
+        array = realloc((void*)array, sizeof(int)*pown);
+        int i;
+        for(i = size; i < pown; i++)
+            array[i] = 0;                           //This should be the minimun possible value in the input
+        size = pown;
+        printf("Nuevo tamaño: %d\n",size);
+    }
     size_t array_dataSize = sizeof(int)*size;
 
     //Allocate space for the arrays
@@ -193,6 +186,15 @@ int *radixsort(int *array, int size) {
     devices = (cl_device_id*)malloc(numDevices*sizeof(cl_device_id));
     //Fill with device info
     errNum = clGetDeviceIDs(platforms[0], CL_DEVICE_TYPE_ALL /*TODO ^^^*/, numDevices, devices, NULL);
+
+
+#ifdef PRINT
+    cl_ulong local_mem_size;
+    clGetDeviceInfo(devices[0], CL_DEVICE_LOCAL_MEM_SIZE, sizeof(cl_ulong), &local_mem_size, 0);
+    int local_mem = local_mem_size;
+    printf("\n\nLocal mem size: %d\n\n", local_mem);
+#endif
+
 
     //----------------
     // Create context
@@ -303,13 +305,12 @@ int *radixsort(int *array, int size) {
     //-------------------------------
     // Set kernels constant arguments
     //-------------------------------
-    int arrlen = ARRLEN;
 
     //Count fixed args
     size_t CountGlobalWorkSize = N_GROUPS * WG_SIZE;
     size_t CountLocalWorkSize = WG_SIZE;
     errNum = clSetKernelArg(count, 2, sizeof(int)*BUCK*WG_SIZE, NULL);  // Local Histogram
-    errNum |= clSetKernelArg(count, 4, sizeof(int), &arrlen);           // Number of elements in array /*TODO: Round to power of 2*/
+    errNum |= clSetKernelArg(count, 4, sizeof(int), &size);           // Number of elements in array /*TODO: Round to power of 2*/
 
     //Scan fixed args
     size_t ScanGlobalWorkSize = (BUCK * N_GROUPS * WG_SIZE) / 2;
@@ -337,7 +338,7 @@ int *radixsort(int *array, int size) {
     size_t ReorderGlobalWorkSize = N_GROUPS * WG_SIZE;
     size_t ReorderLocalWorkSize = WG_SIZE;
     errNum = clSetKernelArg(reorder, 1, sizeof(cl_mem), &scan_buffer);    //Prefix Sum array
-    errNum |= clSetKernelArg(reorder, 4, sizeof(int), &arrlen);            // Number of elements in array /*TODO: Round to power of 2*/
+    errNum |= clSetKernelArg(reorder, 4, sizeof(int), &size);            // Number of elements in array /*TODO: Round to power of 2*/
     errNum |= clSetKernelArg(reorder, 5, sizeof(int)*BUCK*WG_SIZE, NULL);  // Local Histogram
 
 
@@ -362,6 +363,20 @@ int *radixsort(int *array, int size) {
         errNum = clEnqueueNDRangeKernel(commandQueue, count, 1, NULL, &CountGlobalWorkSize, &CountLocalWorkSize, 0, NULL, NULL);
         if(!errNum == CL_SUCCESS){
             printf("Count kernel terminated abruptly\n");
+            switch(errNum) {
+                case CL_INVALID_KERNEL_ARGS:
+                    printf("Invalid kernel args\n");
+                    break;
+                case CL_OUT_OF_RESOURCES:
+                    printf("Out of resources\n");
+                    break;
+                case CL_MEM_OBJECT_ALLOCATION_FAILURE:
+                    printf("Memobject allocation failure\n");
+                    break;
+                default:
+                    printf("Unspecified case\n");
+            }
+ 
             exit(1);
         }
         clFinish(commandQueue);
@@ -468,7 +483,7 @@ int *radixsort(int *array, int size) {
     // Enqueue host read (device buffer -> host)
     //-------------------
     
-    errNum = clEnqueueReadBuffer(commandQueue, output_buffer, CL_TRUE, 0, array_dataSize, output, 0, NULL, NULL);
+    errNum = clEnqueueReadBuffer(commandQueue, output_buffer, CL_TRUE, sizeof(int) * diff, array_dataSize, output, 0, NULL, NULL);
     clFinish(commandQueue);
     
     
