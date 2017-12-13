@@ -40,6 +40,6 @@
 
 /*Testing functions*/
 //Size of the array to order (if _RS_FILLFUN_ not defined, generateArray will create a random one).
-#define ARRLEN 10896724
+#define ARRLEN 2048
 
 #endif /*_RADIXSORT_H_*/

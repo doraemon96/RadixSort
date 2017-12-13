@@ -28,7 +28,7 @@
 int *radixsort(int *array, int size);
 int cmpfunc (const void * a, const void * b)
 {
-    return ( *(int*)a < *(int*)b );
+    return ( *(int*)a - *(int*)b );
 }
 
 int isPowerOfTwo(int x)
@@ -61,16 +61,15 @@ int main(void)
     uint64_t delta = (end.tv_sec - start.tv_sec) * 1000000 + (end.tv_nsec - start.tv_nsec) / 1000;
     printf("Radixsort of %d numbers took %" PRIu64 " microseconds\n", ARRLEN, delta);
 
-/*
     clock_gettime(CLOCK_MONOTONIC_RAW, &start);
     //Call quicksort
     qsort(array, ARRLEN, sizeof(int), cmpfunc);
     clock_gettime(CLOCK_MONOTONIC_RAW, &end);
     delta = (end.tv_sec - start.tv_sec) * 1000000 + (end.tv_nsec - start.tv_nsec) / 1000;
     printf("Quicksort of %d numbers took %" PRIu64 " microseconds\n", ARRLEN, delta);
-*/
 
 #ifdef PRINT
+    //Deactivate qsort before printing
     printf("Arreglo Original:\n");
     for(i=0; i<ARRLEN; i++) {
         printf("[%d]", array[i]);
@@ -83,11 +82,17 @@ int main(void)
     printf("\n\n");
 #endif
 
-    /*Check if sorted*/
+    //Check if sorted
     checkorder(sorted,ARRLEN);
-    
+    //Check against qsort
+    for(i=0; i<ARRLEN; i++){
+        if(array[i] != sorted[i]){
+            printf("Differs!\n");
+            exit(1);
+        }
+    }
+   
     return 0;
-
 }
 
 
@@ -119,6 +124,23 @@ int *radixsort(int *array, int size) {
 
     //Optimize data array size 
     int diff = 0;
+/*
+    diff = size % (WG_SIZE * N_GROUPS);
+    if(diff != 0){
+        diff = (WG_SIZE * N_GROUPS) - diff;
+        array = (int*)realloc(array, sizeof(int)*(size + diff));
+        if(array == NULL){
+            printf("FAILED REALLOC!");
+            exit(1);
+        }
+        int i;
+        for(i = size; i < size+diff; i++){
+            array[i] = 0;
+        }
+        size = size + diff;
+        printf("Nuevo tamaño: %d\n",size);
+    }
+
     if (!isPowerOfTwo(size)) {
         printf("Optimizando arreglo\n");
         int pown = 1;
@@ -128,10 +150,11 @@ int *radixsort(int *array, int size) {
         array = realloc((void*)array, sizeof(int)*pown);
         int i;
         for(i = size; i < pown; i++)
-            array[i] = 0;                           //This should be the minimun possible value in the input
+            array[i] = 0;  //This should be the minimun possible value in the input
         size = pown;
         printf("Nuevo tamaño: %d\n",size);
     }
+*/
     size_t array_dataSize = sizeof(int)*size;
 
     //Allocate space for the arrays
